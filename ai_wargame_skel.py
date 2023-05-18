@@ -98,6 +98,51 @@ class Game:
         print(f"Turns played: {self.turns_played}")
         print(self.board_string())
 
+    def is_valid(self, row, col):
+        if row < 0 or row >= self.dim or col < 0 or col >= self.dim:
+            return False
+        return True
+
+    def input_move_string(self):
+        while True:
+            s = input(F'Player {self.next_player.name}, enter your move: ')
+            coord = Coord()
+            coord.from_string(s)
+            if self.is_valid(coord.row, coord.col):
+                return coord
+            else:
+                print('The move is not valid! Try again.')
+
+##############################################################################################################
+
+@dataclass
+class Coord:
+    row : int = 0
+    col : int = 0
+
+    def col_string(self):
+            coord_char = '?'
+            if self.col < 16:
+                    coord_char = "0123456789abcdef"[self.col]
+            return str(coord_char)
+
+    def row_string(self):
+            coord_char = '?'
+            if self.row < 26:
+                    coord_char = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[self.row]
+            return str(coord_char)
+
+    def to_string(self):
+            return self.row_string()+self.col_string()
+
+    def from_string(self, s : str):
+            s = s.strip()
+            for sep in " ,.:;-_":
+                    s = s.replace(sep, "")
+            if (len(s) == 2):
+                self.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[0:1].upper())
+                self.col = "0123456789abcdef".find(s[1:2].lower())
+
 ##############################################################################################################
 
 g = Game()
@@ -132,3 +177,5 @@ print(g.move_unit(2,1,3,2))
 print(g)
 
 g.pretty_print()
+
+print(g.input_move_string())

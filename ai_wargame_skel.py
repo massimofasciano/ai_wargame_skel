@@ -130,6 +130,19 @@ class Game:
 
     def __post_init__(self):
          self.board = [[None for _ in range(self.dim)] for _ in range(self.dim)]
+         md = self.dim-1
+         self.set(Coord(0,0),Unit(player=Player.Defender))
+         self.set(Coord(1,0),Unit(player=Player.Defender))
+         self.set(Coord(0,1),Unit(player=Player.Defender))
+         self.set(Coord(2,0),Unit(player=Player.Defender))
+         self.set(Coord(0,2),Unit(player=Player.Defender))
+         self.set(Coord(1,1),Unit(player=Player.Defender))
+         self.set(Coord(md,md),Unit(player=Player.Attacker))
+         self.set(Coord(md-1,md),Unit(player=Player.Attacker))
+         self.set(Coord(md,md-1),Unit(player=Player.Attacker))
+         self.set(Coord(md-2,md),Unit(player=Player.Attacker))
+         self.set(Coord(md,md-2),Unit(player=Player.Attacker))
+         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker))
 
     def is_empty(self, coord : Coord) -> bool:
         return self.board[coord.row][coord.col] is None
@@ -168,23 +181,23 @@ class Game:
         output += f"Next player: {self.next_player.name}\n"
         output += f"Turns played: {self.turns_played}\n"
         coord = Coord()
-        output += "  "
+        output += "   "
         for col in range(self.dim):
             coord.col = col
             label = coord.to_string()[1]
-            output += f"{label:^3}"
+            output += f"{label:^5}"
         output += "\n"
         for row in range(self.dim):
             coord.row = row
             label = coord.to_string()[0]
-            output += f"{label:2}"
+            output += f"{label}: "
             for col in range(self.dim):
                 coord.col = col
                 unit = self.get(coord)
                 if unit is None:
-                    output += " . "
+                    output += "  .  "
                 else:
-                    output += str(unit)
+                    output += f"{str(unit):^5}"
             output += "\n"
         return output
 

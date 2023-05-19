@@ -1,6 +1,7 @@
 from enum import Enum
-from dataclasses import dataclass
-   
+from dataclasses import dataclass, field
+from typing import TypeVar, Type
+
 class UnitType(Enum):
     AI = 0
     Tech = 1
@@ -30,10 +31,83 @@ class Unit:
         elif self.health > 9:
             self.health = 9
 
-    def string3(self):
+    def to_string(self):
         p = self.player.name.lower()[0]
         t = self.type.name.upper()[0]
         return f"{p}{t}{self.health}"
+    
+    def __str__(self):
+        return self.to_string()
+
+##############################################################################################################
+
+CoordType = TypeVar('CoordType', bound='Coord')
+
+@dataclass
+class Coord:
+    row : int = 0
+    col : int = 0
+
+    def col_string(self):
+        coord_char = '?'
+        if self.col < 16:
+                coord_char = "0123456789abcdef"[self.col]
+        return str(coord_char)
+
+    def row_string(self):
+        coord_char = '?'
+        if self.row < 26:
+                coord_char = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[self.row]
+        return str(coord_char)
+
+    def to_string(self):
+        return self.row_string()+self.col_string()
+    
+    def __str__(self):
+        return self.to_string()
+
+    @classmethod
+    def from_string(cls : Type[CoordType], s : str) -> CoordType|None:
+        s = s.strip()
+        for sep in " ,.:;-_":
+                s = s.replace(sep, "")
+        if (len(s) == 2):
+            coord = cls()
+            coord.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[0:1].upper())
+            coord.col = "0123456789abcdef".find(s[1:2].lower())
+            return coord
+        else:
+            return None
+
+##############################################################################################################
+
+CoordPairType = TypeVar('CoordPairType', bound='CoordPair')
+
+@dataclass()
+class CoordPair:
+    src : Coord = field(default_factory=Coord)
+    dst : Coord = field(default_factory=Coord)
+
+    def to_string(self):
+        return self.src.to_string()+" "+self.dst.to_string()
+    
+    def __str__(self):
+        return self.to_string()
+
+    @classmethod
+    def from_string(cls : Type[CoordPairType], s : str) -> CoordPairType|None:
+        s = s.strip()
+        for sep in " ,.:;-_":
+                s = s.replace(sep, "")
+        if (len(s) == 4):
+            coords = cls()
+            coords.src.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[0:1].upper())
+            coords.src.col = "0123456789abcdef".find(s[1:2].lower())
+            coords.dst.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[2:3].upper())
+            coords.dst.col = "0123456789abcdef".find(s[3:4].lower())
+            return coords
+        else:
+            return None
 
 ##############################################################################################################
 
@@ -49,28 +123,28 @@ class Game:
              self.dim = dim
          self.board = [[None for _ in range(self.dim)] for _ in range(self.dim)]
 
-    def is_empty(self, row : int, col : int) -> bool:
-        return self.board[row][col] is None
+    def is_empty(self, coord : Coord) -> bool:
+        return self.board[coord.row][coord.col] is None
 
-    def get(self, row : int, col : int) -> Unit|None:
-        return self.board[row][col]
+    def get(self, coord : Coord) -> Unit|None:
+        return self.board[coord.row][coord.col]
 
-    def set(self, row : int, col : int, unit : Unit|None):
-        self.board[row][col] = unit
+    def set(self, coord : Coord, unit : Unit|None):
+        self.board[coord.row][coord.col] = unit
 
-    def mod_health(self, row : int, col : int, health_delta : int):
-        target = self.get(row,col)
+    def mod_health(self, coord : Coord, health_delta : int):
+        target = self.get(coord)
         if target is not None:
             target.mod_health(health_delta)
             if not target.is_alive():
-                self.set(row,col,None)
+                self.set(coord,None)
 
-    def move_unit(self, from_row : int, from_col: int, to_row : int, to_col: int) -> bool:
+    def move_unit(self, coords : CoordPair) -> bool:
         # TODO: must check all other move conditions!
-        source = self.get(from_row,from_col)
-        if source is not None and source.player == self.next_player and self.is_empty(to_row,to_col):
-            self.set(to_row,to_col,source)
-            self.set(from_row,from_col,None) 
+        source = self.get(coords.src)
+        if source is not None and source.player == self.next_player and self.is_empty(coords.dst):
+            self.set(coords.dst,source)
+            self.set(coords.src,None) 
             return True
         return False
 
@@ -81,101 +155,94 @@ class Game:
             self.next_player = Player.Attacker
         self.turns_played += 1
 
-    def board_string(self):
+    def to_string(self):
         output = ""
+        output += f"Next player: {self.next_player.name}\n"
+        output += f"Turns played: {self.turns_played}\n"
+        coord = Coord()
+        output += "  "
+        for col in range(self.dim):
+            coord.col = col
+            label = coord.to_string()[1]
+            output += f"{label:^3}"
+        output += "\n"
         for row in range(self.dim):
+            coord.row = row
+            label = coord.to_string()[0]
+            output += f"{label:2}"
             for col in range(self.dim):
-                unit = self.get(row,col)
+                coord.col = col
+                unit = self.get(coord)
                 if unit is None:
                     output += " . "
                 else:
-                    output += unit.string3()
+                    output += str(unit)
             output += "\n"
         return output
 
-    def pretty_print(self):
-        print(f"Next player: {self.next_player.name}")
-        print(f"Turns played: {self.turns_played}")
-        print(self.board_string())
-
-    def is_valid(self, row, col):
-        if row < 0 or row >= self.dim or col < 0 or col >= self.dim:
+    def __str__(self):
+        return self.to_string()
+    
+    def is_valid_coord(self, coord: Coord):
+        if coord.row < 0 or coord.row >= self.dim or coord.col < 0 or coord.col >= self.dim:
             return False
         return True
 
-    def input_move_string(self):
+    def read_move(self) -> CoordPair:
         while True:
             s = input(F'Player {self.next_player.name}, enter your move: ')
-            coord = Coord()
-            coord.from_string(s)
-            if self.is_valid(coord.row, coord.col):
-                return coord
+            coords = CoordPair.from_string(s)
+            if coords is not None and self.is_valid_coord(coords.src) and self.is_valid_coord(coords.dst):
+                return coords
             else:
-                print('The move is not valid! Try again.')
-
-##############################################################################################################
-
-@dataclass
-class Coord:
-    row : int = 0
-    col : int = 0
-
-    def col_string(self):
-            coord_char = '?'
-            if self.col < 16:
-                    coord_char = "0123456789abcdef"[self.col]
-            return str(coord_char)
-
-    def row_string(self):
-            coord_char = '?'
-            if self.row < 26:
-                    coord_char = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[self.row]
-            return str(coord_char)
-
-    def to_string(self):
-            return self.row_string()+self.col_string()
-
-    def from_string(self, s : str):
-            s = s.strip()
-            for sep in " ,.:;-_":
-                    s = s.replace(sep, "")
-            if (len(s) == 2):
-                self.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[0:1].upper())
-                self.col = "0123456789abcdef".find(s[1:2].lower())
+                print('Invalid coordinates! Try again.')
 
 ##############################################################################################################
 
 g = Game()
 
-g.set(3,4,Unit())
-g.set(2,1,Unit(player=Player.Defender, type=UnitType.Virus, health=3))
+d4 = Coord.from_string("D4")
+assert(d4 is not None)
+c1 = Coord(2,1)
 
+g.set(d4,Unit())
+g.set(c1,Unit(player=Player.Defender, type=UnitType.Virus, health=3))
+
+print(repr(g))
 print(g)
-print(g.is_empty(3,4))
-print(g.is_empty(4,4))
+print(g.is_empty(d4))
+print(g.is_empty(Coord(4,4)))
 
-g.pretty_print()
+g.set(d4,None)
+print(g.is_empty(d4))
+print(g.get(d4))
+print(f"{g.get(c1)!r}")
+print(g.get(c1))
+print(repr(g.get(c1)))
 
-g.set(3,4,None)
-print(g.is_empty(3,4))
-print(g.get(3,4))
-print(g.get(2,1))
 
-g.pretty_print()
+g.mod_health(c1,-2)
+print(g.get(c1))
+g.mod_health(c1,-2)
+print(g.get(c1))
 
-g.mod_health(2,1,-2)
-print(g.get(2,1))
-g.mod_health(2,1,-2)
-print(g.get(2,1))
 
-g.pretty_print()
-
-g.set(2,1,Unit(player=Player.Defender))
-print(g.move_unit(2,1,3,2))
+g.set(c1,Unit(player=Player.Defender))
+print(g)
+mv2132 = CoordPair(c1,Coord(3,2))
+print(g.move_unit(mv2132))
 g.next_turn()
-print(g.move_unit(2,1,3,2))
+print(g.move_unit(mv2132))
 print(g)
 
-g.pretty_print()
+while True:
+    mv = g.read_move()
+    print(mv)
+    if g.move_unit(mv):
+        g.next_turn()
+        break
+    else:
+        print("The move is not valid! Try again.")
 
-print(g.input_move_string())
+print(g)
+print(repr(g))

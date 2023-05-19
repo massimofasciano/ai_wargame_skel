@@ -1,7 +1,8 @@
 import argparse
+import copy
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import TypeVar, Type
+from typing import Tuple, TypeVar, Type, Iterable
 import random
 
 class UnitType(Enum):
@@ -73,6 +74,9 @@ class Coord:
     
     def __str__(self):
         return self.to_string()
+    
+    def clone(self):
+        return copy.copy(self)
 
     @classmethod
     def from_string(cls : Type[CoordType], s : str) -> CoordType|None:
@@ -120,30 +124,50 @@ class CoordPair:
 ##############################################################################################################
 
 @dataclass()
-class Game:
-    board: list[list[Unit|None]] = field(default_factory=list)
-    next_player: Player = Player.Attacker
+class Options:
     dim: int = 5
-    turns_played : int = 0
     max_depth : int | None = None
     max_time : float | None = None
     game_type : GameType = GameType.AttackerVsDefender
 
+##############################################################################################################
+
+@dataclass()
+class Stats:
+    total_evaluations : int = 0
+
+##############################################################################################################
+
+@dataclass()
+class Game:
+    board: list[list[Unit|None]] = field(default_factory=list)
+    next_player: Player = Player.Attacker
+    turns_played : int = 0
+    options: Options = field(default_factory=Options)
+    stats: Stats = field(default_factory=Stats)
+
     def __post_init__(self):
-         self.board = [[None for _ in range(self.dim)] for _ in range(self.dim)]
-         md = self.dim-1
-         self.set(Coord(0,0),Unit(player=Player.Defender))
-         self.set(Coord(1,0),Unit(player=Player.Defender))
-         self.set(Coord(0,1),Unit(player=Player.Defender))
-         self.set(Coord(2,0),Unit(player=Player.Defender))
-         self.set(Coord(0,2),Unit(player=Player.Defender))
-         self.set(Coord(1,1),Unit(player=Player.Defender))
-         self.set(Coord(md,md),Unit(player=Player.Attacker))
-         self.set(Coord(md-1,md),Unit(player=Player.Attacker))
-         self.set(Coord(md,md-1),Unit(player=Player.Attacker))
-         self.set(Coord(md-2,md),Unit(player=Player.Attacker))
-         self.set(Coord(md,md-2),Unit(player=Player.Attacker))
-         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker))
+         dim = self.options.dim
+         self.board = [[None for _ in range(dim)] for _ in range(dim)]
+         md = dim-1
+         self.set(Coord(0,0),Unit(player=Player.Defender,type=UnitType.AI))
+         self.set(Coord(1,0),Unit(player=Player.Defender,type=UnitType.Tech))
+         self.set(Coord(0,1),Unit(player=Player.Defender,type=UnitType.Tech))
+         self.set(Coord(2,0),Unit(player=Player.Defender,type=UnitType.Program))
+         self.set(Coord(0,2),Unit(player=Player.Defender,type=UnitType.Program))
+         self.set(Coord(1,1),Unit(player=Player.Defender,type=UnitType.Firewall))
+         self.set(Coord(md,md),Unit(player=Player.Attacker,type=UnitType.AI))
+         self.set(Coord(md-1,md),Unit(player=Player.Attacker,type=UnitType.Virus))
+         self.set(Coord(md,md-1),Unit(player=Player.Attacker,type=UnitType.Virus))
+         self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Firewall))
+         self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Firewall))
+         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Program))
+
+    def clone(self):
+        # make a shallow copy of everything except the board (options and stats are shared)
+        new = copy.copy(self)
+        new.board = copy.deepcopy(self.board)
+        return new
 
     def is_empty(self, coord : Coord) -> bool:
         return self.board[coord.row][coord.col] is None
@@ -164,10 +188,16 @@ class Game:
     def move_unit(self, coords : CoordPair) -> bool:
         # TODO: must check all other move conditions!
         source = self.get(coords.src)
-        if source is not None and source.player == self.next_player and self.is_empty(coords.dst):
-            self.set(coords.dst,source)
-            self.set(coords.src,None) 
-            return True
+        if source is not None and source.player == self.next_player:
+            if self.is_empty(coords.dst):
+                # we move it (many checks missing!!!)
+                self.set(coords.dst,source)
+                self.set(coords.src,None) 
+                return True
+            elif coords.src == coords.dst:
+                # we self destruct (side effects missing!!!)
+                self.set(coords.src,None)
+                return True
         return False
 
     def next_turn(self):
@@ -178,21 +208,22 @@ class Game:
         self.turns_played += 1
 
     def to_string(self):
+        dim = self.options.dim
         output = ""
         output += f"Next player: {self.next_player.name}\n"
         output += f"Turns played: {self.turns_played}\n"
         coord = Coord()
         output += "   "
-        for col in range(self.dim):
+        for col in range(dim):
             coord.col = col
             label = coord.to_string()[1]
             output += f"{label:^5}"
         output += "\n"
-        for row in range(self.dim):
+        for row in range(dim):
             coord.row = row
             label = coord.to_string()[0]
             output += f"{label}: "
-            for col in range(self.dim):
+            for col in range(dim):
                 coord.col = col
                 unit = self.get(coord)
                 if unit is None:
@@ -206,7 +237,8 @@ class Game:
         return self.to_string()
     
     def is_valid_coord(self, coord: Coord):
-        if coord.row < 0 or coord.row >= self.dim or coord.col < 0 or coord.col >= self.dim:
+        dim = self.options.dim
+        if coord.row < 0 or coord.row >= dim or coord.col < 0 or coord.col >= dim:
             return False
         return True
 
@@ -229,16 +261,48 @@ class Game:
                 print("The move is not valid! Try again.")
 
     def computer_turn(self):
+        dim = self.options.dim
         while True:
-            d1 = random.randint(0, self.dim-1)
-            d2 = random.randint(0, self.dim-1)
-            d3 = random.randint(0, self.dim-1)
-            d4 = random.randint(0, self.dim-1)
+            d1 = random.randint(0, dim-1)
+            d2 = random.randint(0, dim-1)
+            d3 = random.randint(0, dim-1)
+            d4 = random.randint(0, dim-1)
             mv = CoordPair(Coord(d1,d2),Coord(d3,d4))
             if self.move_unit(mv):
                 self.next_turn()
                 break
 
+    def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]] :
+        dim = self.options.dim
+        coord = Coord()
+        for row in range(dim):
+            coord.row = row
+            for col in range(dim):
+                coord.col = col
+                unit = self.get(coord)
+                if unit is not None and unit.player == player:
+                    yield (coord.clone(),unit)
+
+    def is_finished(self) -> bool:
+        attacker_has_ai = False
+        defender_has_ai = False
+        dim = self.options.dim
+        coord = Coord()
+        for row in range(dim):
+            coord.row = row
+            for col in range(dim):
+                coord.col = col
+                unit = self.get(coord)
+                if unit is not None:
+                    if unit.player == Player.Attacker and unit.type == UnitType.AI:
+                        attacker_has_ai = True
+                    if unit.player == Player.Defender and unit.type == UnitType.AI:
+                        defender_has_ai = True
+                if attacker_has_ai and defender_has_ai:
+                    print("both ai")
+                    return False
+        return True
+    
 ##############################################################################################################
 
 def just_testing():
@@ -298,14 +362,21 @@ def main():
         game_type = GameType.CompVsDefender
     else:
         game_type = GameType.CompVsComp
-    game = Game(max_depth=args.max_depth, max_time=args.max_time, game_type=game_type)
+    options = Options(max_depth=args.max_depth, max_time=args.max_time, game_type=game_type)
+    game = Game(options=options)
     print(repr(game))
 
     while True:
         print(game)
         game.human_turn()
+        if game.is_finished():
+            print("Game over!")
+            break
         print(game)
         game.computer_turn()
+        if game.is_finished():
+            print("Game over!")
+            break
 
 if __name__ == '__main__':
     # just_testing()

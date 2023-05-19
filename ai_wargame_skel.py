@@ -2,6 +2,7 @@ import argparse
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import TypeVar, Type
+import random
 
 class UnitType(Enum):
     AI = 0
@@ -221,7 +222,6 @@ class Game:
     def human_turn(self):
         while True:
             mv = self.read_move()
-            print(mv)
             if self.move_unit(mv):
                 self.next_turn()
                 break
@@ -229,7 +229,15 @@ class Game:
                 print("The move is not valid! Try again.")
 
     def computer_turn(self):
-        self.human_turn()
+        while True:
+            d1 = random.randint(0, self.dim-1)
+            d2 = random.randint(0, self.dim-1)
+            d3 = random.randint(0, self.dim-1)
+            d4 = random.randint(0, self.dim-1)
+            mv = CoordPair(Coord(d1,d2),Coord(d3,d4))
+            if self.move_unit(mv):
+                self.next_turn()
+                break
 
 ##############################################################################################################
 
@@ -296,6 +304,8 @@ def main():
     while True:
         print(game)
         game.human_turn()
+        print(game)
+        game.computer_turn()
 
 if __name__ == '__main__':
     # just_testing()

@@ -1,3 +1,4 @@
+import argparse
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import TypeVar, Type
@@ -12,6 +13,12 @@ class UnitType(Enum):
 class Player(Enum):
     Attacker = 0
     Defender = 1
+
+class GameType(Enum):
+    AttackerVsDefender = 0
+    AttackerVsComp = 1
+    CompVsDefender = 2
+    CompVsComp = 3
 
 ##############################################################################################################
 
@@ -111,16 +118,17 @@ class CoordPair:
 
 ##############################################################################################################
 
-@dataclass(init=False)
+@dataclass()
 class Game:
-    board: list[list[Unit|None]]
+    board: list[list[Unit|None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
     dim: int = 5
     turns_played : int = 0
+    max_depth : int | None = None
+    max_time : float | None = None
+    game_type : GameType = GameType.AttackerVsDefender
 
-    def __init__(self, dim: int|None = None):
-         if dim is not None:
-             self.dim = dim
+    def __post_init__(self):
          self.board = [[None for _ in range(self.dim)] for _ in range(self.dim)]
 
     def is_empty(self, coord : Coord) -> bool:
@@ -196,53 +204,86 @@ class Game:
                 return coords
             else:
                 print('Invalid coordinates! Try again.')
+    
+    def human_turn(self):
+        while True:
+            mv = self.read_move()
+            print(mv)
+            if self.move_unit(mv):
+                self.next_turn()
+                break
+            else:
+                print("The move is not valid! Try again.")
+
+    def computer_turn(self):
+        self.human_turn()
 
 ##############################################################################################################
 
-g = Game()
+def just_testing():
+    g = Game()
 
-d4 = Coord.from_string("D4")
-assert(d4 is not None)
-c1 = Coord(2,1)
+    d4 = Coord.from_string("D4")
+    assert(d4 is not None)
+    c1 = Coord(2,1)
 
-g.set(d4,Unit())
-g.set(c1,Unit(player=Player.Defender, type=UnitType.Virus, health=3))
+    g.set(d4,Unit())
+    g.set(c1,Unit(player=Player.Defender, type=UnitType.Virus, health=3))
 
-print(repr(g))
-print(g)
-print(g.is_empty(d4))
-print(g.is_empty(Coord(4,4)))
+    print(repr(g))
+    print(g)
+    print(g.is_empty(d4))
+    print(g.is_empty(Coord(4,4)))
 
-g.set(d4,None)
-print(g.is_empty(d4))
-print(g.get(d4))
-print(f"{g.get(c1)!r}")
-print(g.get(c1))
-print(repr(g.get(c1)))
-
-
-g.mod_health(c1,-2)
-print(g.get(c1))
-g.mod_health(c1,-2)
-print(g.get(c1))
+    g.set(d4,None)
+    print(g.is_empty(d4))
+    print(g.get(d4))
+    print(f"{g.get(c1)!r}")
+    print(g.get(c1))
+    print(repr(g.get(c1)))
 
 
-g.set(c1,Unit(player=Player.Defender))
-print(g)
-mv2132 = CoordPair(c1,Coord(3,2))
-print(g.move_unit(mv2132))
-g.next_turn()
-print(g.move_unit(mv2132))
-print(g)
+    g.mod_health(c1,-2)
+    print(g.get(c1))
+    g.mod_health(c1,-2)
+    print(g.get(c1))
 
-while True:
-    mv = g.read_move()
-    print(mv)
-    if g.move_unit(mv):
-        g.next_turn()
-        break
+
+    g.set(c1,Unit(player=Player.Defender))
+    print(g)
+    mv2132 = CoordPair(c1,Coord(3,2))
+    print(g.move_unit(mv2132))
+    g.next_turn()
+    print(g.move_unit(mv2132))
+    print(g)
+
+    g.human_turn()
+    print(g)
+    print(repr(g))
+
+##############################################################################################################
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='ai_wargame',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--max_depth', type=int, help='maximum search depth')
+    parser.add_argument('--max_time', type=float, help='maximum search time')
+    parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender')
+    args = parser.parse_args()
+    if args.game_type == "attacker":
+        game_type = GameType.AttackerVsComp
+    elif args.game_type == "defender":
+        game_type = GameType.CompVsDefender
     else:
-        print("The move is not valid! Try again.")
+        game_type = GameType.CompVsComp
+    game = Game(max_depth=args.max_depth, max_time=args.max_time, game_type=game_type)
+    print(repr(game))
 
-print(g)
-print(repr(g))
+    while True:
+        print(game)
+        game.human_turn()
+
+if __name__ == '__main__':
+    # just_testing()
+    main()

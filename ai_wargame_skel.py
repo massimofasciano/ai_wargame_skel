@@ -2,7 +2,7 @@ import argparse
 import copy
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Tuple, TypeVar, Type, Iterable
+from typing import Tuple, TypeVar, Type, Iterable, Self
 import random
 
 class UnitType(Enum):
@@ -40,12 +40,12 @@ class Unit:
         elif self.health > 9:
             self.health = 9
 
-    def to_string(self):
+    def to_string(self) -> str:
         p = self.player.name.lower()[0]
         t = self.type.name.upper()[0]
         return f"{p}{t}{self.health}"
     
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_string()
 
 ##############################################################################################################
@@ -57,28 +57,28 @@ class Coord:
     row : int = 0
     col : int = 0
 
-    def col_string(self):
+    def col_string(self) -> str:
         coord_char = '?'
         if self.col < 16:
                 coord_char = "0123456789abcdef"[self.col]
         return str(coord_char)
 
-    def row_string(self):
+    def row_string(self) -> str:
         coord_char = '?'
         if self.row < 26:
                 coord_char = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[self.row]
         return str(coord_char)
 
-    def to_string(self):
+    def to_string(self) -> str:
         return self.row_string()+self.col_string()
     
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_string()
     
-    def clone(self):
+    def clone(self) -> Self:
         return copy.copy(self)
 
-    def iter_range(self, dist: int):
+    def iter_range(self, dist: int) -> Iterable[Self]:
         for row in range(self.row-dist,self.row+1+dist):
             for col in range(self.col-dist,self.col+1+dist):
                 yield Coord(row,col)
@@ -105,10 +105,10 @@ class CoordPair:
     src : Coord = field(default_factory=Coord)
     dst : Coord = field(default_factory=Coord)
 
-    def to_string(self):
+    def to_string(self) -> str:
         return self.src.to_string()+" "+self.dst.to_string()
     
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_string()
 
     def iter_rectangle(self) -> Iterable[Coord]:
@@ -181,7 +181,7 @@ class Game:
          self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Firewall))
          self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Program))
 
-    def clone(self):
+    def clone(self) -> Self:
         # make a shallow copy of everything except the board (options and stats are shared)
         new = copy.copy(self)
         new.board = copy.deepcopy(self.board)
@@ -225,7 +225,7 @@ class Game:
             self.next_player = Player.Attacker
         self.turns_played += 1
 
-    def to_string(self):
+    def to_string(self) -> str:
         dim = self.options.dim
         output = ""
         output += f"Next player: {self.next_player.name}\n"
@@ -251,10 +251,10 @@ class Game:
             output += "\n"
         return output
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_string()
     
-    def is_valid_coord(self, coord: Coord):
+    def is_valid_coord(self, coord: Coord) -> bool:
         dim = self.options.dim
         if coord.row < 0 or coord.row >= dim or coord.col < 0 or coord.col >= dim:
             return False

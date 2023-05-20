@@ -24,7 +24,7 @@ class GameType(Enum):
 
 ##############################################################################################################
 
-@dataclass
+@dataclass(slots=True)
 class Unit:
     player: Player = Player.Attacker
     type: UnitType = UnitType.Program
@@ -52,7 +52,7 @@ class Unit:
 
 CoordType = TypeVar('CoordType', bound='Coord')
 
-@dataclass
+@dataclass(slots=True)
 class Coord:
     row : int = 0
     col : int = 0
@@ -78,6 +78,11 @@ class Coord:
     def clone(self):
         return copy.copy(self)
 
+    def iter_range(self, dist: int):
+        for row in range(self.row-dist,self.row+1+dist):
+            for col in range(self.col-dist,self.col+1+dist):
+                yield Coord(row,col)
+
     @classmethod
     def from_string(cls : Type[CoordType], s : str) -> CoordType|None:
         s = s.strip()
@@ -95,7 +100,7 @@ class Coord:
 
 CoordPairType = TypeVar('CoordPairType', bound='CoordPair')
 
-@dataclass()
+@dataclass(slots=True)
 class CoordPair:
     src : Coord = field(default_factory=Coord)
     dst : Coord = field(default_factory=Coord)
@@ -106,6 +111,19 @@ class CoordPair:
     def __str__(self):
         return self.to_string()
 
+    def iter_rectangle(self) -> Iterable[Coord]:
+        for row in range(self.src.row,self.dst.row+1):
+            for col in range(self.src.col,self.dst.col+1):
+                yield Coord(row,col)
+
+    @classmethod
+    def from_quad(cls : Type[CoordPairType], row0: int, col0: int, row1: int, col1: int) -> CoordPairType:
+        return cls(Coord(row0,col0),Coord(row1,col1))
+    
+    @classmethod
+    def from_dim(cls : Type[CoordPairType], dim: int) -> CoordPairType:
+        return cls(Coord(0,0),Coord(dim-1,dim-1))
+    
     @classmethod
     def from_string(cls : Type[CoordPairType], s : str) -> CoordPairType|None:
         s = s.strip()
@@ -123,7 +141,7 @@ class CoordPair:
 
 ##############################################################################################################
 
-@dataclass()
+@dataclass(slots=True)
 class Options:
     dim: int = 5
     max_depth : int | None = None
@@ -132,13 +150,13 @@ class Options:
 
 ##############################################################################################################
 
-@dataclass()
+@dataclass(slots=True)
 class Stats:
     total_evaluations : int = 0
 
 ##############################################################################################################
 
-@dataclass()
+@dataclass(slots=True)
 class Game:
     board: list[list[Unit|None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
@@ -272,35 +290,25 @@ class Game:
                 self.next_turn()
                 break
 
-    def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]] :
-        dim = self.options.dim
-        coord = Coord()
-        for row in range(dim):
-            coord.row = row
-            for col in range(dim):
-                coord.col = col
-                unit = self.get(coord)
-                if unit is not None and unit.player == player:
-                    yield (coord.clone(),unit)
+    def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]]:
+        for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
+            unit = self.get(coord)
+            if unit is not None and unit.player == player:
+                yield (coord,unit)
 
     def is_finished(self) -> bool:
         attacker_has_ai = False
         defender_has_ai = False
-        dim = self.options.dim
-        coord = Coord()
-        for row in range(dim):
-            coord.row = row
-            for col in range(dim):
-                coord.col = col
-                unit = self.get(coord)
-                if unit is not None:
-                    if unit.player == Player.Attacker and unit.type == UnitType.AI:
-                        attacker_has_ai = True
-                    if unit.player == Player.Defender and unit.type == UnitType.AI:
-                        defender_has_ai = True
-                if attacker_has_ai and defender_has_ai:
-                    print("both ai")
-                    return False
+        for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
+            unit = self.get(coord)
+            if unit is not None:
+                if unit.player == Player.Attacker and unit.type == UnitType.AI:
+                    attacker_has_ai = True
+                if unit.player == Player.Defender and unit.type == UnitType.AI:
+                    defender_has_ai = True
+            if attacker_has_ai and defender_has_ai:
+                print("both ai")
+                return False
         return True
     
 ##############################################################################################################
@@ -346,6 +354,25 @@ def just_testing():
     print(g)
     print(repr(g))
 
+def just_testing2():
+    cp = CoordPair.from_quad(2,3,5,6)
+    print(cp)
+    print()    
+    for c in cp.iter_rectangle():
+        print(c)
+    c = Coord(4,5)
+
+    print()
+
+    print(c)
+    print()
+    for c in c.iter_range(1):
+        print(c)
+
+    g = Game()
+    for (c,u) in g.player_units(Player.Defender):
+        print(f"{c} => {u}")
+
 ##############################################################################################################
 
 def main():
@@ -379,5 +406,5 @@ def main():
             break
 
 if __name__ == '__main__':
-    # just_testing()
+    # just_testing2()
     main()

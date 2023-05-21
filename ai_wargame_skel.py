@@ -54,6 +54,7 @@ CoordType = TypeVar('CoordType', bound='Coord')
 
 @dataclass(slots=True)
 class Coord:
+    """Representation of a game cell coordinate (row, col)."""
     row : int = 0
     col : int = 0
 
@@ -102,6 +103,7 @@ CoordPairType = TypeVar('CoordPairType', bound='CoordPair')
 
 @dataclass(slots=True)
 class CoordPair:
+    """Representation of a game move or a rectangular area via 2 Coords."""
     src : Coord = field(default_factory=Coord)
     dst : Coord = field(default_factory=Coord)
 
@@ -112,6 +114,7 @@ class CoordPair:
         return self.to_string()
 
     def iter_rectangle(self) -> Iterable[Coord]:
+        """Iterates over cells of a rectangular area."""
         for row in range(self.src.row,self.dst.row+1):
             for col in range(self.src.col,self.dst.col+1):
                 yield Coord(row,col)
@@ -143,6 +146,7 @@ class CoordPair:
 
 @dataclass(slots=True)
 class Options:
+    """Representation of the game options."""
     dim: int = 5
     max_depth : int | None = None
     max_time : float | None = None
@@ -152,12 +156,14 @@ class Options:
 
 @dataclass(slots=True)
 class Stats:
+    """Representation of the global game statistics."""
     total_evaluations : int = 0
 
 ##############################################################################################################
 
 @dataclass(slots=True)
 class Game:
+    """Representation of the game state."""
     board: list[list[Unit|None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
     turns_played : int = 0
@@ -165,38 +171,46 @@ class Game:
     stats: Stats = field(default_factory=Stats)
 
     def __post_init__(self):
-         dim = self.options.dim
-         self.board = [[None for _ in range(dim)] for _ in range(dim)]
-         md = dim-1
-         self.set(Coord(0,0),Unit(player=Player.Defender,type=UnitType.AI))
-         self.set(Coord(1,0),Unit(player=Player.Defender,type=UnitType.Tech))
-         self.set(Coord(0,1),Unit(player=Player.Defender,type=UnitType.Tech))
-         self.set(Coord(2,0),Unit(player=Player.Defender,type=UnitType.Program))
-         self.set(Coord(0,2),Unit(player=Player.Defender,type=UnitType.Program))
-         self.set(Coord(1,1),Unit(player=Player.Defender,type=UnitType.Firewall))
-         self.set(Coord(md,md),Unit(player=Player.Attacker,type=UnitType.AI))
-         self.set(Coord(md-1,md),Unit(player=Player.Attacker,type=UnitType.Virus))
-         self.set(Coord(md,md-1),Unit(player=Player.Attacker,type=UnitType.Virus))
-         self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Firewall))
-         self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Firewall))
-         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Program))
+        """Automatically called after class init to set up the default board state."""
+        dim = self.options.dim
+        self.board = [[None for _ in range(dim)] for _ in range(dim)]
+        md = dim-1
+        self.set(Coord(0,0),Unit(player=Player.Defender,type=UnitType.AI))
+        self.set(Coord(1,0),Unit(player=Player.Defender,type=UnitType.Tech))
+        self.set(Coord(0,1),Unit(player=Player.Defender,type=UnitType.Tech))
+        self.set(Coord(2,0),Unit(player=Player.Defender,type=UnitType.Program))
+        self.set(Coord(0,2),Unit(player=Player.Defender,type=UnitType.Program))
+        self.set(Coord(1,1),Unit(player=Player.Defender,type=UnitType.Firewall))
+        self.set(Coord(md,md),Unit(player=Player.Attacker,type=UnitType.AI))
+        self.set(Coord(md-1,md),Unit(player=Player.Attacker,type=UnitType.Virus))
+        self.set(Coord(md,md-1),Unit(player=Player.Attacker,type=UnitType.Virus))
+        self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Firewall))
+        self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Firewall))
+        self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Program))
 
     def clone(self) -> Self:
-        # make a shallow copy of everything except the board (options and stats are shared)
+        """Make a new copy of a game for minimax recursion.
+
+        Shallow copy of everything except the board (options and stats are shared).
+        """
         new = copy.copy(self)
         new.board = copy.deepcopy(self.board)
         return new
 
     def is_empty(self, coord : Coord) -> bool:
+        """Check if contents of a board cell of the game at Coord is empty."""
         return self.board[coord.row][coord.col] is None
 
     def get(self, coord : Coord) -> Unit|None:
+        """Get contents of a board cell of the game at Coord."""
         return self.board[coord.row][coord.col]
 
     def set(self, coord : Coord, unit : Unit|None):
+        """Set contents of a board cell of the game at Coord."""
         self.board[coord.row][coord.col] = unit
 
     def mod_health(self, coord : Coord, health_delta : int):
+        """Modify health of unit at Coord (positive or negative delta)."""
         target = self.get(coord)
         if target is not None:
             target.mod_health(health_delta)
@@ -204,6 +218,7 @@ class Game:
                 self.set(coord,None)
 
     def move_unit(self, coords : CoordPair) -> bool:
+        """Perform a move expressed as a CoordPair."""
         # TODO: must check all other move conditions!
         source = self.get(coords.src)
         if source is not None and source.player == self.next_player:
@@ -219,6 +234,7 @@ class Game:
         return False
 
     def next_turn(self):
+        """Transitions game to the next turn."""
         if self.next_player == Player.Attacker:
             self.next_player = Player.Defender
         else:
@@ -226,6 +242,7 @@ class Game:
         self.turns_played += 1
 
     def to_string(self) -> str:
+        """Pretty text representation of the game."""
         dim = self.options.dim
         output = ""
         output += f"Next player: {self.next_player.name}\n"
@@ -252,15 +269,18 @@ class Game:
         return output
 
     def __str__(self) -> str:
+        """Default string representation of a game."""
         return self.to_string()
     
     def is_valid_coord(self, coord: Coord) -> bool:
+        """Check if a Coord is valid within out board dimensions."""
         dim = self.options.dim
         if coord.row < 0 or coord.row >= dim or coord.col < 0 or coord.col >= dim:
             return False
         return True
 
     def read_move(self) -> CoordPair:
+        """Read a move from keyboard and return as a CoordPair."""
         while True:
             s = input(F'Player {self.next_player.name}, enter your move: ')
             coords = CoordPair.from_string(s)
@@ -291,12 +311,14 @@ class Game:
                 break
 
     def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]]:
+        """Iterates over all units belonging to a player."""
         for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
             unit = self.get(coord)
             if unit is not None and unit.player == player:
                 yield (coord,unit)
 
     def is_finished(self) -> bool:
+        """Check if the game is over."""
         attacker_has_ai = False
         defender_has_ai = False
         for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
@@ -311,6 +333,9 @@ class Game:
                 return False
         return True
     
+    def minimax(self):
+        print('TODO')
+
 ##############################################################################################################
 
 def just_testing():

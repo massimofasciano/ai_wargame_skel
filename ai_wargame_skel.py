@@ -156,6 +156,7 @@ class Options:
     min_depth : int | None = None
     max_time : float | None = None
     game_type : GameType = GameType.AttackerVsDefender
+    alpha_beta : bool = True
 
 ##############################################################################################################
 
@@ -303,17 +304,11 @@ class Game:
             else:
                 print("The move is not valid! Try again.")
 
-    def computer_turn(self):
-        dim = self.options.dim
-        while True:
-            d1 = random.randint(0, dim-1)
-            d2 = random.randint(0, dim-1)
-            d3 = random.randint(0, dim-1)
-            d4 = random.randint(0, dim-1)
-            mv = CoordPair(Coord(d1,d2),Coord(d3,d4))
-            if self.move_unit(mv):
-                self.next_turn()
-                break
+    def computer_turn(self) -> CoordPair | None:
+        move = self.find_move()
+        if move is not None and self.move_unit(move):
+            self.next_turn()
+        return move
 
     def player_units(self, player: Player) -> Iterable[Tuple[Coord,Unit]]:
         """Iterates over all units belonging to a player."""
@@ -334,90 +329,64 @@ class Game:
                 if unit.player == Player.Defender and unit.type == UnitType.AI:
                     defender_has_ai = True
             if attacker_has_ai and defender_has_ai:
-                print("both ai")
                 return False
         return True
 
     def heuristic(self,player: Player,maximizing_player: bool, depth: int) -> int:
-        return 0
+        self.stats.total_evaluations += 1
+        return random.randint(MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE)
+
+    def move_candidates(self) -> Iterable[CoordPair]:
+        for (src,_) in self.player_units(self.next_player):
+            for dst in CoordPair.from_dim(self.options.dim).iter_rectangle():
+                yield CoordPair(src,dst)
 
     def find_move(self) -> CoordPair|None:
         start_time = datetime.now()
         (score, move, avg_depth) = self.minimax_alpha_beta(True, self.next_player, 0, MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE, start_time)
         return move
 
-    def minimax_alpha_beta(self, maximizing_player: bool, player: Player, depth: int, alpha: int, beta: int, start_time) -> (int, CoordPair|None, float):
+    def minimax_alpha_beta(self, maximizing_player: bool, player: Player, depth: int, alpha: int, beta: int, start_time) -> Tuple[int, CoordPair|None, float]:
         time_now = datetime.now()
         elapsed_seconds = time_now - start_time
         timeout = False
-        if elapsed_seconds > self.options.max_time:
+        if self.options.max_time is not None and elapsed_seconds > self.options.max_time:
             timeout = True 
         if ((timeout and self.options.min_depth is not None and depth >= self.options.min_depth) or
            (self.options.max_depth is not None and depth >= self.options.max_depth) or
            self.is_finished()):
             return (self.heuristic(player,maximizing_player,depth),None,depth)
-    #     let mut opt_end_game_result : Option<Option<Player>> = None;
-    #     if timeout && self.options.min_depth.is_some() && depth >= self.options.min_depth.unwrap()
-    #         || self.options.max_depth.is_some() && depth >= self.options.max_depth.unwrap()
-    #         || { 
-    #             let end_game_result = self.end_game_result();
-    #             opt_end_game_result=Some(end_game_result); 
-    #             end_game_result.is_some()
-    #         } 
-    #     {
-    #         (self.heuristic(player,maximizing_player,depth,opt_end_game_result),None,depth as f32)
-    #     } else {
-    #         let mut best_action = None;
-    #         let mut best_score;
-    #         let mut total_depth = 0.0;
-    #         let mut total_count = 0;
-    #         let mut possible_actions = self.player_unit_coords(self.player())
-    #             .flat_map(|coord|self.possible_actions_from_coord(coord))
-    #             .collect::<Vec<_>>();
-    #         if self.options.rand_traversal {
-    #             possible_actions.shuffle(&mut rand::thread_rng());
-    #         }
-    #         if maximizing_player {
-    #             best_score = heuristics::MIN_HEURISTIC_SCORE;
-    #         } else {
-    #             best_score = heuristics::MAX_HEURISTIC_SCORE;
-    #         }
-    #         let mut alpha = alpha;
-    #         let mut beta = beta;
-    #         for possible_action in possible_actions {
-    #             let mut possible_game = self.clone();
-    #             possible_game.play_turn_from_action(possible_action).expect("action should be valid");
-    #             let (score, _, rec_avg_depth) = possible_game.minimax_alpha_beta(!maximizing_player, player, depth+1, alpha, beta, start_time);
-    #             total_depth += rec_avg_depth;
-    #             total_count += 1;
-    #             if maximizing_player && score >= best_score || !maximizing_player && score <= best_score {
-    #                 best_score = score;
-    #                 best_action = Some(possible_action);
-    #             }
-    #             if self.options.pruning {
-    #                 if maximizing_player {
-    #                     if best_score > beta { break; }
-    #                     alpha = std::cmp::max(alpha, best_score);
-    #                 } else {
-    #                     if best_score < alpha { break; }
-    #                     beta = std::cmp::min(beta, best_score);
-    #                 }
-    #             }
-    #         }
-    #         if total_count == 0 {
-    #             (self.heuristic(player,maximizing_player,depth,opt_end_game_result),None,depth as f32)
-    #         } else {
-    #             #[cfg(feature="stats")]
-    #             {   // branching stats
-    #                 let mut stats = self.stats.lock().expect("should get a lock");
-    #                 stats.total_moves_per_effective_branch += total_count;
-    #                 stats.total_effective_branches += 1;
-    #             }
-    #             (best_score, best_action, total_depth / total_count as f32)
-    #         }
-    #     }
-    # }
-        print('TODO')
+        else:
+            best_move = None
+            if maximizing_player:
+                best_score = MIN_HEURISTIC_SCORE
+            else:
+                best_score = MAX_HEURISTIC_SCORE
+            total_depth = 0.0
+            total_count = 0
+            for move_candidate in self.move_candidates():
+                new_game_state = self.clone()
+                if not new_game_state.move_unit(move_candidate):
+                    continue
+                (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing_player, player, depth+1, alpha, beta, start_time)
+                total_depth += rec_avg_depth
+                total_count += 1
+                if (maximizing_player and score >= best_score) or (not maximizing_player and score <= best_score):
+                    best_score = score
+                    best_move = move_candidate
+                if self.options.alpha_beta:
+                    if maximizing_player:
+                        if best_score > beta:
+                            break
+                        alpha = max(alpha, best_score)
+                    else:
+                        if best_score < alpha:
+                            break
+                        beta = min(beta, best_score)
+            if total_count == 0:
+                return (self.heuristic(player,maximizing_player,depth),None,depth)
+            else:
+                return (best_score, best_move, total_depth / total_count)
 
 ##############################################################################################################
 
@@ -508,8 +477,9 @@ def main():
             print("Game over!")
             break
         print(game)
-        game.computer_turn()
-        if game.is_finished():
+        move = game.computer_turn()
+        print(f"Computer played {move}")
+        if move is None or game.is_finished():
             print("Game over!")
             break
 

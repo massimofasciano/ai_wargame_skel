@@ -152,11 +152,12 @@ class CoordPair:
 class Options:
     """Representation of the game options."""
     dim: int = 5
-    max_depth : int | None = None
-    min_depth : int | None = None
-    max_time : float | None = None
+    max_depth : int | None = 3
+    min_depth : int | None = 1
+    max_time : float | None = 5.0
     game_type : GameType = GameType.AttackerVsDefender
     alpha_beta : bool = True
+    max_turns : int | None = 100
 
 ##############################################################################################################
 
@@ -223,9 +224,22 @@ class Game:
             if not target.is_alive():
                 self.set(coord,None)
 
+    def is_valid_move(self, coords : CoordPair) -> bool:
+        """Validate a move expressed as a CoordPair."""
+        # INCOMPLETE: must check all other move conditions!
+        source = self.get(coords.src)
+        if source is not None and source.player == self.next_player:
+            if self.is_empty(coords.dst):
+                # we can move (many checks missing!!!)
+                return True
+            elif coords.src == coords.dst:
+                # we can self destruct
+                return True
+        return False
+
     def move_unit(self, coords : CoordPair) -> bool:
-        """Perform a move expressed as a CoordPair."""
-        # TODO: must check all other move conditions!
+        """Validate and perform a move expressed as a CoordPair."""
+        # INCOMPLETE: must check all other move conditions!
         source = self.get(coords.src)
         if source is not None and source.player == self.next_player:
             if self.is_empty(coords.dst):
@@ -257,12 +271,12 @@ class Game:
         output += "   "
         for col in range(dim):
             coord.col = col
-            label = coord.to_string()[1]
+            label = coord.col_string()
             output += f"{label:^5}"
         output += "\n"
         for row in range(dim):
             coord.row = row
-            label = coord.to_string()[0]
+            label = coord.row_string()
             output += f"{label}: "
             for col in range(dim):
                 coord.col = col
@@ -305,7 +319,7 @@ class Game:
                 print("The move is not valid! Try again.")
 
     def computer_turn(self) -> CoordPair | None:
-        move = self.find_move()
+        move = self.suggest_move()
         if move is not None and self.move_unit(move):
             self.next_turn()
         return move
@@ -319,6 +333,12 @@ class Game:
 
     def is_finished(self) -> bool:
         """Check if the game is over."""
+        return self.has_winner() is not None
+
+    def has_winner(self) -> Player | None:
+        """Check if the game is over and returns winner"""
+        if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
+            return Player.Defender
         attacker_has_ai = False
         defender_has_ai = False
         for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
@@ -329,36 +349,51 @@ class Game:
                 if unit.player == Player.Defender and unit.type == UnitType.AI:
                     defender_has_ai = True
             if attacker_has_ai and defender_has_ai:
-                return False
-        return True
+                return None
+        if attacker_has_ai:
+            return Player.Attacker
+        return Player.Defender
 
-    def heuristic(self,player: Player,maximizing_player: bool, depth: int) -> int:
+    def heuristic(self, player: Player, maximizing: bool, depth: int, winner: Player | None) -> int:
+        """Simplistic heuristic evaluation. Potential winner needs to be precalculated."""
         self.stats.total_evaluations += 1
-        return random.randint(MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE)
+        # we could use "maximizing" to select different heuristics for min and max stages
+        if winner is None:
+            return random.randint(MIN_HEURISTIC_SCORE // 2, MAX_HEURISTIC_SCORE // 2)
+        elif winner == player:
+            return MAX_HEURISTIC_SCORE
+        else:
+            return MIN_HEURISTIC_SCORE
 
     def move_candidates(self) -> Iterable[CoordPair]:
+        """Generate valid move candidates for the next player."""
         for (src,_) in self.player_units(self.next_player):
             for dst in CoordPair.from_dim(self.options.dim).iter_rectangle():
                 yield CoordPair(src,dst)
 
-    def find_move(self) -> CoordPair|None:
+    def suggest_move(self) -> CoordPair|None:
+        """Suggest the next move using minimax alpha beta."""
         start_time = datetime.now()
         (score, move, avg_depth) = self.minimax_alpha_beta(True, self.next_player, 0, MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE, start_time)
+        elapsed_seconds = (datetime.now() - start_time).total_seconds()
+        print(f"Elapsed time: {elapsed_seconds:0.1}s")
         return move
 
-    def minimax_alpha_beta(self, maximizing_player: bool, player: Player, depth: int, alpha: int, beta: int, start_time) -> Tuple[int, CoordPair|None, float]:
+    def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time) -> Tuple[int, CoordPair|None, float]:
+        """Minimax with alpha beta pruning."""
         time_now = datetime.now()
-        elapsed_seconds = time_now - start_time
+        elapsed_seconds = (time_now - start_time).total_seconds()
         timeout = False
         if self.options.max_time is not None and elapsed_seconds > self.options.max_time:
-            timeout = True 
+            timeout = True
+        winner = self.has_winner()
         if ((timeout and self.options.min_depth is not None and depth >= self.options.min_depth) or
            (self.options.max_depth is not None and depth >= self.options.max_depth) or
-           self.is_finished()):
-            return (self.heuristic(player,maximizing_player,depth),None,depth)
+           winner is not None):
+            return (self.heuristic(player,maximizing,depth,winner),None,depth)
         else:
             best_move = None
-            if maximizing_player:
+            if maximizing:
                 best_score = MIN_HEURISTIC_SCORE
             else:
                 best_score = MAX_HEURISTIC_SCORE
@@ -368,14 +403,14 @@ class Game:
                 new_game_state = self.clone()
                 if not new_game_state.move_unit(move_candidate):
                     continue
-                (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing_player, player, depth+1, alpha, beta, start_time)
+                (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing, player, depth+1, alpha, beta, start_time)
                 total_depth += rec_avg_depth
                 total_count += 1
-                if (maximizing_player and score >= best_score) or (not maximizing_player and score <= best_score):
+                if (maximizing and score >= best_score) or (not maximizing and score <= best_score):
                     best_score = score
                     best_move = move_candidate
                 if self.options.alpha_beta:
-                    if maximizing_player:
+                    if maximizing:
                         if best_score > beta:
                             break
                         alpha = max(alpha, best_score)
@@ -384,7 +419,7 @@ class Game:
                             break
                         beta = min(beta, best_score)
             if total_count == 0:
-                return (self.heuristic(player,maximizing_player,depth),None,depth)
+                return (self.heuristic(player,maximizing,depth,winner),None,depth)
             else:
                 return (best_score, best_move, total_depth / total_count)
 
@@ -466,7 +501,11 @@ def main():
         game_type = GameType.CompVsDefender
     else:
         game_type = GameType.CompVsComp
-    options = Options(max_depth=args.max_depth, max_time=args.max_time, game_type=game_type)
+    options = Options(game_type=game_type)
+    if args.max_depth is not None:
+        options.max_depth = args.max_depth
+    if args.max_time is not None:
+        options.max_time = args.max_time
     game = Game(options=options)
     print(repr(game))
 

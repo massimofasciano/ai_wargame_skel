@@ -3,7 +3,8 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Tuple, TypeVar, Type, Iterable, Self
+# from typing import Tuple, TypeVar, Type, Iterable, Self
+from typing import Tuple, TypeVar, Type, Iterable
 import random
 
 MAX_HEURISTIC_SCORE = 1000000
@@ -20,7 +21,7 @@ class Player(Enum):
     Attacker = 0
     Defender = 1
 
-    def next(self) -> Self:
+    def next(self) -> 'Player':
         if self is Player.Attacker:
             return Player.Defender
         else:
@@ -60,8 +61,6 @@ class Unit:
 
 ##############################################################################################################
 
-CoordType = TypeVar('CoordType', bound='Coord')
-
 @dataclass(slots=True)
 class Coord:
     """Representation of a game cell coordinate (row, col)."""
@@ -86,21 +85,21 @@ class Coord:
     def __str__(self) -> str:
         return self.to_string()
     
-    def clone(self) -> Self:
+    def clone(self) -> 'Coord':
         return copy.copy(self)
 
-    def iter_range(self, dist: int) -> Iterable[Self]:
+    def iter_range(self, dist: int) -> Iterable['Coord']:
         for row in range(self.row-dist,self.row+1+dist):
             for col in range(self.col-dist,self.col+1+dist):
                 yield Coord(row,col)
 
     @classmethod
-    def from_string(cls : Type[CoordType], s : str) -> CoordType|None:
+    def from_string(cls, s : str) -> 'Coord | None':
         s = s.strip()
         for sep in " ,.:;-_":
                 s = s.replace(sep, "")
         if (len(s) == 2):
-            coord = cls()
+            coord = Coord()
             coord.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[0:1].upper())
             coord.col = "0123456789abcdef".find(s[1:2].lower())
             return coord
@@ -108,8 +107,6 @@ class Coord:
             return None
 
 ##############################################################################################################
-
-CoordPairType = TypeVar('CoordPairType', bound='CoordPair')
 
 @dataclass(slots=True)
 class CoordPair:
@@ -123,7 +120,7 @@ class CoordPair:
     def __str__(self) -> str:
         return self.to_string()
 
-    def clone(self) -> Self:
+    def clone(self) -> 'CoordPair':
         return copy.copy(self)
 
     def iter_rectangle(self) -> Iterable[Coord]:
@@ -133,20 +130,20 @@ class CoordPair:
                 yield Coord(row,col)
 
     @classmethod
-    def from_quad(cls : Type[CoordPairType], row0: int, col0: int, row1: int, col1: int) -> CoordPairType:
-        return cls(Coord(row0,col0),Coord(row1,col1))
+    def from_quad(cls, row0: int, col0: int, row1: int, col1: int) -> 'CoordPair':
+        return CoordPair(Coord(row0,col0),Coord(row1,col1))
     
     @classmethod
-    def from_dim(cls : Type[CoordPairType], dim: int) -> CoordPairType:
-        return cls(Coord(0,0),Coord(dim-1,dim-1))
+    def from_dim(cls, dim: int) -> 'CoordPair':
+        return CoordPair(Coord(0,0),Coord(dim-1,dim-1))
     
     @classmethod
-    def from_string(cls : Type[CoordPairType], s : str) -> CoordPairType|None:
+    def from_string(cls, s : str) -> 'CoordPair|None':
         s = s.strip()
         for sep in " ,.:;-_":
                 s = s.replace(sep, "")
         if (len(s) == 4):
-            coords = cls()
+            coords = CoordPair()
             coords.src.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[0:1].upper())
             coords.src.col = "0123456789abcdef".find(s[1:2].lower())
             coords.dst.row = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".find(s[2:3].upper())
@@ -205,7 +202,7 @@ class Game:
         self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Firewall))
         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Program))
 
-    def clone(self) -> Self:
+    def clone(self) -> 'Game':
         """Make a new copy of a game for minimax recursion.
 
         Shallow copy of everything except the board (options and stats are shared).

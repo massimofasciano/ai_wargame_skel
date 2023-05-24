@@ -20,6 +20,12 @@ class Player(Enum):
     Attacker = 0
     Defender = 1
 
+    def next(self) -> Self:
+        if self is Player.Attacker:
+            return Player.Defender
+        else:
+            return Player.Defender
+
 class GameType(Enum):
     AttackerVsDefender = 0
     AttackerVsComp = 1
@@ -117,6 +123,9 @@ class CoordPair:
     def __str__(self) -> str:
         return self.to_string()
 
+    def clone(self) -> Self:
+        return copy.copy(self)
+
     def iter_rectangle(self) -> Iterable[Coord]:
         """Iterates over cells of a rectangular area."""
         for row in range(self.src.row,self.dst.row+1):
@@ -152,8 +161,8 @@ class CoordPair:
 class Options:
     """Representation of the game options."""
     dim: int = 5
-    max_depth : int | None = 3
-    min_depth : int | None = 1
+    max_depth : int | None = 4
+    min_depth : int | None = 2
     max_time : float | None = 5.0
     game_type : GameType = GameType.AttackerVsDefender
     alpha_beta : bool = True
@@ -164,7 +173,8 @@ class Options:
 @dataclass(slots=True)
 class Stats:
     """Representation of the global game statistics."""
-    total_evaluations : int = 0
+    evaluations_per_depth : dict[int,int] = field(default_factory=dict)
+    total_seconds: float = 0.0
 
 ##############################################################################################################
 
@@ -205,16 +215,26 @@ class Game:
         return new
 
     def is_empty(self, coord : Coord) -> bool:
-        """Check if contents of a board cell of the game at Coord is empty."""
+        """Check if contents of a board cell of the game at Coord is empty (must be valid coord)."""
         return self.board[coord.row][coord.col] is None
 
     def get(self, coord : Coord) -> Unit|None:
         """Get contents of a board cell of the game at Coord."""
-        return self.board[coord.row][coord.col]
+        if self.is_valid_coord(coord):
+            return self.board[coord.row][coord.col]
+        else:
+            return None
 
     def set(self, coord : Coord, unit : Unit|None):
         """Set contents of a board cell of the game at Coord."""
-        self.board[coord.row][coord.col] = unit
+        if self.is_valid_coord(coord):
+            self.board[coord.row][coord.col] = unit
+
+    def remove_dead(self, coord: Coord):
+        """Remove unit at Coord if dead."""
+        unit = self.get(coord)
+        if unit is not None and unit.health <= 0:
+            self.set(coord,None)
 
     def mod_health(self, coord : Coord, health_delta : int):
         """Modify health of unit at Coord (positive or negative delta)."""
@@ -226,30 +246,74 @@ class Game:
 
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair."""
-        # INCOMPLETE: must check all other move conditions!
-        source = self.get(coords.src)
-        if source is not None and source.player == self.next_player:
-            if self.is_empty(coords.dst):
-                # we can move (many checks missing!!!)
-                return True
-            elif coords.src == coords.dst:
-                # we can self destruct
-                return True
-        return False
+        return self.validate_and_move(coords,False)
 
     def move_unit(self, coords : CoordPair) -> bool:
         """Validate and perform a move expressed as a CoordPair."""
+        return self.validate_and_move(coords,True)
+
+    def check_move_range(self, coords: CoordPair) -> bool:
+        """Is this move within the movement range of a unit?"""
+        if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
+            return False
+        unit = self.get(coords.src)
+        if unit is None:
+            return False
+        elif unit.type is UnitType.Tech or unit.type is UnitType.Virus:
+            # tech and virus can retreat
+            return (
+                abs(coords.dst.col-coords.src.col)+
+                abs(coords.dst.row-coords.src.row)
+            ) == 1
+        elif unit.player is Player.Attacker:
+            # attacker moves top and left
+            return (
+                coords.src.col-coords.dst.col+
+                coords.src.row-coords.dst.row
+            ) == 1
+        else:
+            # defender moves bottom and right
+            return (
+                coords.dst.col-coords.src.col+
+                coords.dst.row-coords.src.row
+            ) == 1
+
+    def validate_and_move(self, coords : CoordPair, perform_move: bool) -> bool:
+        """Validate and optionally perform a move expressed as a CoordPair."""
         # INCOMPLETE: must check all other move conditions!
         source = self.get(coords.src)
-        if source is not None and source.player == self.next_player:
-            if self.is_empty(coords.dst):
-                # we move it (many checks missing!!!)
-                self.set(coords.dst,source)
-                self.set(coords.src,None) 
-                return True
-            elif coords.src == coords.dst:
+        if source is None or not self.is_valid_coord(coords.dst):
+            return False
+        target = self.get(coords.dst)
+        if source.player == self.next_player:
+            if coords.src == coords.dst:
                 # we self destruct (side effects missing!!!)
-                self.set(coords.src,None)
+                if perform_move:
+                    for coord in coords.src.iter_range(1):
+                        unit = self.get(coord)
+                        if unit is not None:
+                            unit.mod_health(-2)
+                            self.remove_dead(coord)
+                    self.set(coords.src,None)
+                return True
+            elif target is None and self.check_move_range(coords):
+                # we move it (many checks missing!!!)
+                if perform_move:
+                    self.set(coords.dst,source)
+                    self.set(coords.src,None) 
+                return True
+            elif target is not None and target.player != source.player and self.check_move_range(coords):
+                # we attack opposing unit!
+                if perform_move:
+                    target.mod_health(-1)
+                    source.mod_health(-1)
+                    self.remove_dead(coords.src)
+                    self.remove_dead(coords.dst)
+                return True
+            elif target is not None and target.player == source.player and self.check_move_range(coords):
+                # we repair friendly unit
+                if perform_move:
+                    target.mod_health(1)
                 return True
         return False
 
@@ -354,29 +418,53 @@ class Game:
             return Player.Attacker
         return Player.Defender
 
-    def heuristic(self, player: Player, maximizing: bool, depth: int, winner: Player | None) -> int:
-        """Simplistic heuristic evaluation. Potential winner needs to be precalculated."""
-        self.stats.total_evaluations += 1
+    def apply_heuristic(self, player: Player, maximizing: bool, depth: int, winner: Player | None) -> int:
+        """Apply custom heuristic evaluation after some general calculations. Potential winner needs to be precalculated."""
+        if depth not in self.stats.evaluations_per_depth:
+            self.stats.evaluations_per_depth[depth] = 1
+        else:
+            self.stats.evaluations_per_depth[depth] += 1
         # we could use "maximizing" to select different heuristics for min and max stages
         if winner is None:
-            return random.randint(MIN_HEURISTIC_SCORE // 2, MAX_HEURISTIC_SCORE // 2)
+            return self.heuristic_health(player)
         elif winner == player:
-            return MAX_HEURISTIC_SCORE
+            # prefer to win earlier
+            return MAX_HEURISTIC_SCORE - self.turns_played
         else:
-            return MIN_HEURISTIC_SCORE
+            # prefer to lose later
+            return MIN_HEURISTIC_SCORE + self.turns_played
+
+    def heuristic_health(self, player: Player):
+        def get_health(cu : Tuple[Coord,Unit]) -> int:
+            return cu[1].health
+        return (
+            sum(map(get_health,self.player_units(player))) -
+            sum(map(get_health,self.player_units(player.next()))) +
+            random.randint(0,1)
+        )
 
     def move_candidates(self) -> Iterable[CoordPair]:
         """Generate valid move candidates for the next player."""
+        move = CoordPair()
         for (src,_) in self.player_units(self.next_player):
-            for dst in CoordPair.from_dim(self.options.dim).iter_rectangle():
-                yield CoordPair(src,dst)
+            move.src = src
+            for dst in src.iter_range(1):
+                move.dst = dst
+                if self.is_valid_move(move):
+                    yield move.clone()
 
     def suggest_move(self) -> CoordPair|None:
         """Suggest the next move using minimax alpha beta."""
         start_time = datetime.now()
         (score, move, avg_depth) = self.minimax_alpha_beta(True, self.next_player, 0, MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE, start_time)
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
-        print(f"Elapsed time: {elapsed_seconds:0.1}s")
+        self.stats.total_seconds += elapsed_seconds
+        print(f"Heuristic score: {score}")
+        print(f"Evals per depth: {self.stats.evaluations_per_depth}")
+        total_evals = sum(self.stats.evaluations_per_depth.values())
+        if self.stats.total_seconds > 0:
+            print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
+        print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
 
     def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time) -> Tuple[int, CoordPair|None, float]:
@@ -390,7 +478,7 @@ class Game:
         if ((timeout and self.options.min_depth is not None and depth >= self.options.min_depth) or
            (self.options.max_depth is not None and depth >= self.options.max_depth) or
            winner is not None):
-            return (self.heuristic(player,maximizing,depth,winner),None,depth)
+            return (self.apply_heuristic(player,maximizing,depth,winner),None,depth)
         else:
             best_move = None
             if maximizing:
@@ -403,6 +491,7 @@ class Game:
                 new_game_state = self.clone()
                 if not new_game_state.move_unit(move_candidate):
                     continue
+                new_game_state.next_turn()
                 (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing, player, depth+1, alpha, beta, start_time)
                 total_depth += rec_avg_depth
                 total_count += 1
@@ -419,7 +508,7 @@ class Game:
                             break
                         beta = min(beta, best_score)
             if total_count == 0:
-                return (self.heuristic(player,maximizing,depth,winner),None,depth)
+                return (self.apply_heuristic(player,maximizing,depth,winner),None,depth)
             else:
                 return (best_score, best_move, total_depth / total_count)
 
@@ -509,18 +598,28 @@ def main():
     game = Game(options=options)
     print(repr(game))
 
-    while True:
-        print(game)
-        game.human_turn()
-        if game.is_finished():
-            print("Game over!")
-            break
-        print(game)
-        move = game.computer_turn()
-        print(f"Computer played {move}")
-        if move is None or game.is_finished():
-            print("Game over!")
-            break
+    print(game)
+    if game.options.game_type == GameType.CompVsComp:
+        while True:
+            move = game.computer_turn()
+            print(game)
+            print(f"Computer played {move}")
+            if move is None or game.is_finished():
+                print("Game over!")
+                break
+    elif game.options.game_type == GameType.AttackerVsComp:
+        while True:
+            game.human_turn()
+            print(game)
+            if game.is_finished():
+                print("Game over!")
+                break
+            move = game.computer_turn()
+            print(game)
+            print(f"Computer played {move}")
+            if move is None or game.is_finished():
+                print("Game over!")
+                break
 
 if __name__ == '__main__':
     # just_testing2()

@@ -3,7 +3,7 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Tuple, TypeVar, Type, Iterable
+from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
 import requests
 
@@ -18,24 +18,6 @@ class UnitType(Enum):
     Virus = 2
     Program = 3
     Firewall = 4
-
-# damage table for units (based on the unit type constants in order)
-_damage_table = [
-    [3,3,3,3,1],
-    [1,1,6,1,1],
-    [9,6,1,6,1],
-    [3,3,3,3,1],
-    [1,1,1,1,1],
-]
-
-# repair table for units (based on the unit type constants in order)
-_repair_table = [
-    [0,1,1,0,0],
-    [3,0,0,3,3],
-    [0,0,0,0,0],
-    [0,0,0,0,0],
-    [0,0,0,0,0],
-]
 
 class Player(Enum):
     """The 2 players."""
@@ -62,6 +44,22 @@ class Unit:
     player: Player = Player.Attacker
     type: UnitType = UnitType.Program
     health : int = 9
+    # class variable: damage table for units (based on the unit type constants in order)
+    damage_table : ClassVar[list[list[int]]] = [
+        [3,3,3,3,1], # AI
+        [1,1,6,1,1], # Tech
+        [9,6,1,6,1], # Virus
+        [3,3,3,3,1], # Program
+        [1,1,1,1,1], # Firewall
+    ]
+    # class variable: repair table for units (based on the unit type constants in order)
+    repair_table : ClassVar[list[list[int]]] = [
+        [0,1,1,0,0], # AI
+        [3,0,0,3,3], # Tech
+        [0,0,0,0,0], # Virus
+        [0,0,0,0,0], # Program
+        [0,0,0,0,0], # Firewall
+    ]
 
     def is_alive(self) -> bool:
         """Are we alive ?"""
@@ -87,14 +85,14 @@ class Unit:
     
     def damage_amount(self, target: 'Unit') -> int:
         """How much can this unit damage another unit."""
-        amount = _damage_table[self.type.value][target.type.value]
+        amount = self.damage_table[self.type.value][target.type.value]
         if target.health - amount < 0:
             return target.health
         return amount
 
     def repair_amount(self, target: 'Unit') -> int:
         """How much can this unit repair another unit."""
-        amount = _repair_table[self.type.value][target.type.value]
+        amount = self.repair_table[self.type.value][target.type.value]
         if target.health + amount > 9:
             return 9 - target.health
         return amount

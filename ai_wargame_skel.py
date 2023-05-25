@@ -3,20 +3,22 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
-# from typing import Tuple, TypeVar, Type, Iterable, Self
 from typing import Tuple, TypeVar, Type, Iterable
 import random
 
+# maximum and minimum values for our heuristic scores (usually represents an end of game condition)
 MAX_HEURISTIC_SCORE = 1000000
 MIN_HEURISTIC_SCORE = -1000000
 
 class UnitType(Enum):
+    """Every unit type."""
     AI = 0
     Tech = 1
     Virus = 2
     Program = 3
     Firewall = 4
 
+# damage table for units (based on the unit type constants in order)
 _damage_table = [
     [3,3,3,3,1],
     [1,1,6,1,1],
@@ -25,6 +27,7 @@ _damage_table = [
     [1,1,1,1,1],
 ]
 
+# repair table for units (based on the unit type constants in order)
 _repair_table = [
     [0,1,1,0,0],
     [3,0,0,3,3],
@@ -34,10 +37,12 @@ _repair_table = [
 ]
 
 class Player(Enum):
+    """The 2 players."""
     Attacker = 0
     Defender = 1
 
     def next(self) -> 'Player':
+        """The other player."""
         if self is Player.Attacker:
             return Player.Defender
         else:
@@ -58,9 +63,11 @@ class Unit:
     health : int = 9
 
     def is_alive(self) -> bool:
+        """Are we alive ?"""
         return self.health > 0
 
     def mod_health(self, health_delta : int):
+        """Modify this unit's health by delta amount."""
         self.health += health_delta
         if self.health < 0:
             self.health = 0
@@ -68,20 +75,24 @@ class Unit:
             self.health = 9
 
     def to_string(self) -> str:
+        """Text representation of this unit."""
         p = self.player.name.lower()[0]
         t = self.type.name.upper()[0]
         return f"{p}{t}{self.health}"
     
     def __str__(self) -> str:
+        """Text representation of this unit."""
         return self.to_string()
     
     def damage_amount(self, target: 'Unit') -> int:
+        """How much can this unit damage another unit."""
         amount = _damage_table[self.type.value][target.type.value]
         if target.health - amount < 0:
             return target.health
         return amount
 
     def repair_amount(self, target: 'Unit') -> int:
+        """How much can this unit repair another unit."""
         amount = _repair_table[self.type.value][target.type.value]
         if target.health + amount > 9:
             return 9 - target.health
@@ -96,32 +107,39 @@ class Coord:
     col : int = 0
 
     def col_string(self) -> str:
+        """Text representation of this Coord's column."""
         coord_char = '?'
         if self.col < 16:
                 coord_char = "0123456789abcdef"[self.col]
         return str(coord_char)
 
     def row_string(self) -> str:
+        """Text representation of this Coord's row."""
         coord_char = '?'
         if self.row < 26:
                 coord_char = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[self.row]
         return str(coord_char)
 
     def to_string(self) -> str:
+        """Text representation of this Coord."""
         return self.row_string()+self.col_string()
     
     def __str__(self) -> str:
+        """Text representation of this Coord."""
         return self.to_string()
     
     def clone(self) -> 'Coord':
+        """Clone a Coord."""
         return copy.copy(self)
 
     def iter_range(self, dist: int) -> Iterable['Coord']:
+        """Iterates over Coords inside a rectangle centered on our Coord."""
         for row in range(self.row-dist,self.row+1+dist):
             for col in range(self.col-dist,self.col+1+dist):
                 yield Coord(row,col)
 
     def iter_adjacent(self) -> Iterable['Coord']:
+        """Iterates over adjacent Coords."""
         yield Coord(self.row-1,self.col)
         yield Coord(self.row,self.col-1)
         yield Coord(self.row+1,self.col)
@@ -129,6 +147,7 @@ class Coord:
 
     @classmethod
     def from_string(cls, s : str) -> 'Coord | None':
+        """Create a Coord from a string. ex: D2."""
         s = s.strip()
         for sep in " ,.:;-_":
                 s = s.replace(sep, "")
@@ -149,12 +168,15 @@ class CoordPair:
     dst : Coord = field(default_factory=Coord)
 
     def to_string(self) -> str:
+        """Text representation of a CoordPair."""
         return self.src.to_string()+" "+self.dst.to_string()
     
     def __str__(self) -> str:
+        """Text representation of a CoordPair."""
         return self.to_string()
 
     def clone(self) -> 'CoordPair':
+        """Clones a CoordPair."""
         return copy.copy(self)
 
     def iter_rectangle(self) -> Iterable[Coord]:
@@ -165,14 +187,17 @@ class CoordPair:
 
     @classmethod
     def from_quad(cls, row0: int, col0: int, row1: int, col1: int) -> 'CoordPair':
+        """Create a CoordPair from 4 integers."""
         return CoordPair(Coord(row0,col0),Coord(row1,col1))
     
     @classmethod
     def from_dim(cls, dim: int) -> 'CoordPair':
+        """Create a CoordPair based on a dim-sized rectangle."""
         return CoordPair(Coord(0,0),Coord(dim-1,dim-1))
     
     @classmethod
     def from_string(cls, s : str) -> 'CoordPair|None':
+        """Create a CoordPair from a string. ex: A3 B2"""
         s = s.strip()
         for sep in " ,.:;-_":
                 s = s.replace(sep, "")
@@ -310,6 +335,7 @@ class Game:
             ) == 1
 
     def is_engaged(self, src: Coord) -> bool:
+        """Is the unit at Coord engaged in combat with opposing units ?"""
         source = self.get(src)
         if source is None:
             return False
@@ -418,6 +444,7 @@ class Game:
                 print('Invalid coordinates! Try again.')
     
     def human_turn(self):
+        """Human player plays a move."""
         while True:
             mv = self.read_move()
             if self.move_unit(mv):
@@ -427,6 +454,7 @@ class Game:
                 print("The move is not valid! Try again.")
 
     def computer_turn(self) -> CoordPair | None:
+        """Computer plays a move."""
         move = self.suggest_move()
         if move is not None and self.move_unit(move):
             self.next_turn()
@@ -478,15 +506,8 @@ class Game:
             # prefer to lose later
             return MIN_HEURISTIC_SCORE + self.turns_played
 
-    def heuristic_health(self, player: Player):
-        def get_health(cu : Tuple[Coord,Unit]) -> int:
-            return cu[1].health
-        return (
-            sum(map(get_health,self.player_units(player))) -
-            sum(map(get_health,self.player_units(player.next())))
-        )
-
     def heuristic_e1(self, player: Player):
+        """Heuristic based on score per unit type."""
         def get_score(cu : Tuple[Coord,Unit]) -> int:
             unit = cu[1]
             score = 1
@@ -503,6 +524,7 @@ class Game:
         )
 
     def heuristic_e2(self, player: Player):
+        """Heuristic based on unit health and score per unit type and game turns."""
         def get_score(cu : Tuple[Coord,Unit]) -> int:
             unit = cu[1]
             score = 1
@@ -543,7 +565,7 @@ class Game:
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
 
-    def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time) -> Tuple[int, CoordPair|None, float]:
+    def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time: datetime) -> Tuple[int, CoordPair|None, float]:
         """Minimax with alpha beta pruning."""
         time_now = datetime.now()
         elapsed_seconds = (time_now - start_time).total_seconds()
@@ -591,6 +613,7 @@ class Game:
 ##############################################################################################################
 
 def main():
+    # parse command line arguments
     parser = argparse.ArgumentParser(
         prog='ai_wargame',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -599,6 +622,7 @@ def main():
     parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
 
+    # parse the game type
     if args.game_type == "attacker":
         game_type = GameType.AttackerVsComp
     elif args.game_type == "defender":
@@ -608,16 +632,20 @@ def main():
     else:
         game_type = GameType.CompVsComp
 
+    # set up game options
     options = Options(game_type=game_type)
 
+    # override class defaults via command line options
     if args.max_depth is not None:
         options.max_depth = args.max_depth
     if args.max_time is not None:
         options.max_time = args.max_time
 
+    # create a new game
     game = Game(options=options)
     print(repr(game))
 
+    # the main game loop
     while True:
         print()
         print(game)

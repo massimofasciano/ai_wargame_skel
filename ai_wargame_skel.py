@@ -447,6 +447,7 @@ class Game:
     
     def human_turn(self):
         """Human player plays a move."""
+        self.get_move()
         while True:
             mv = self.read_move()
             if self.move_unit(mv):
@@ -630,6 +631,16 @@ class Game:
             "turn": self.turns_played
         })
         print(f"Status Code: {r.status_code}, Response: {r.json()}")
+        # Status Code: 200, Response: {'success': True, 'data': {'from': {'row': 2, 'col': 4}, 'to': {'row': 1, 'col': 4}, 'turn': 1}}
+
+    def get_move(self) -> CoordPair | None:
+        if broker_url is None:
+            return None
+        headers = {'Accept': 'application/json'}
+        r = requests.get(broker_url, headers=headers)
+        print(f"Response: {r.json()}")
+        # Response: {'success': True, 'data': {'from': {'row': 2, 'col': 4}, 'to': {'row': 1, 'col': 4}, 'turn': 1}}
+        return None
 
 # broker_url = "http://192.168.140.40:8001/test"
 broker_url = None

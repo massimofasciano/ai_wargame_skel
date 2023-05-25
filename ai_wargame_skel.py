@@ -680,21 +680,24 @@ def main():
             move = game.computer_turn()
             print(game)
             print(f"Computer played {move}")
-            if move is None or game.is_finished():
-                print("Game over!")
+            winner = game.has_winner()
+            if winner is not None:
+                print(f"{winner.name} wins!")
                 break
     elif game.options.game_type == GameType.AttackerVsComp:
         while True:
             game.human_turn()
             print(game)
-            if game.is_finished():
-                print("Game over!")
+            winner = game.has_winner()
+            if winner is not None:
+                print(f"{winner.name} wins!")
                 break
             move = game.computer_turn()
             print(game)
             print(f"Computer played {move}")
-            if move is None or game.is_finished():
-                print("Game over!")
+            winner = game.has_winner()
+            if winner is not None:
+                print(f"{winner.name} wins!")
                 break
 
 if __name__ == '__main__':

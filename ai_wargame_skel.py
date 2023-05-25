@@ -3,13 +3,14 @@ import copy
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass, field
+from time import sleep
 from typing import Tuple, TypeVar, Type, Iterable, ClassVar
 import random
 import requests
 
 # maximum and minimum values for our heuristic scores (usually represents an end of game condition)
-MAX_HEURISTIC_SCORE = 1000000
-MIN_HEURISTIC_SCORE = -1000000
+MAX_HEURISTIC_SCORE = 2000000000
+MIN_HEURISTIC_SCORE = -2000000000
 
 class UnitType(Enum):
     """Every unit type."""
@@ -223,6 +224,7 @@ class Options:
     alpha_beta : bool = True
     max_turns : int | None = 100
     randomize_moves : bool = True
+    broker : str | None = None
 
 ##############################################################################################################
 
@@ -402,11 +404,11 @@ class Game:
         output += f"Next player: {self.next_player.name}\n"
         output += f"Turns played: {self.turns_played}\n"
         coord = Coord()
-        output += "   "
+        output += "\n   "
         for col in range(dim):
             coord.col = col
             label = coord.col_string()
-            output += f"{label:^5}"
+            output += f"{label:^3} "
         output += "\n"
         for row in range(dim):
             coord.row = row
@@ -416,9 +418,9 @@ class Game:
                 coord.col = col
                 unit = self.get(coord)
                 if unit is None:
-                    output += "  .  "
+                    output += " .  "
                 else:
-                    output += f"{str(unit):^5}"
+                    output += f"{str(unit):^3} "
             output += "\n"
         return output
 
@@ -444,15 +446,23 @@ class Game:
                 print('Invalid coordinates! Try again.')
     
     def human_turn(self):
-        """Human player plays a move."""
-        self.get_move()
-        while True:
-            mv = self.read_move()
-            if self.move_unit(mv):
-                self.next_turn()
-                break
-            else:
-                print("The move is not valid! Try again.")
+        """Human player plays a move (or get via broker)."""
+        if self.options.broker is not None:
+            print("Getting next move with auto-retry from game broker...")
+            while True:
+                mv = self.get_move_from_broker()
+                if mv is not None and self.move_unit(mv):
+                    self.next_turn()
+                    break
+                sleep(0.1)
+        else:
+            while True:
+                mv = self.read_move()
+                if self.move_unit(mv):
+                    self.next_turn()
+                    break
+                else:
+                    print("The move is not valid! Try again.")
 
     def computer_turn(self) -> CoordPair | None:
         """Computer plays a move."""
@@ -620,8 +630,8 @@ class Game:
             else:
                 return (best_score, best_move, total_depth / total_count)
 
-    def post_move(self, move: CoordPair):
-        if broker_url is None:
+    def post_move_to_broker(self, move: CoordPair):
+        if self.options.broker is None:
             return
         data = {
             "from": {"row": move.src.row, "col": move.src.col},
@@ -629,7 +639,7 @@ class Game:
             "turn": self.turns_played
         }
         try:
-            r = requests.post(broker_url, json=data)
+            r = requests.post(self.options.broker, json=data)
             if r.status_code == 200 and r.json()['success'] and r.json()['data'] == data:
                 # print(f"Sent move to broker: {move}")
                 pass
@@ -638,12 +648,12 @@ class Game:
         except Exception as error:
             print(f"Broker error: {error}")
 
-    def get_move(self) -> CoordPair | None:
-        if broker_url is None:
+    def get_move_from_broker(self) -> CoordPair | None:
+        if self.options.broker is None:
             return None
         headers = {'Accept': 'application/json'}
         try:
-            r = requests.get(broker_url, headers=headers)
+            r = requests.get(self.options.broker, headers=headers)
             if r.status_code == 200 and r.json()['success']:
                 data = r.json()['data']
                 if data is not None:
@@ -655,19 +665,17 @@ class Game:
                         print(f"Got move from broker: {move}")
                         return move
                     else:
-                        print("Got broker data for wrong turn")
+                        # print("Got broker data for wrong turn.")
+                        # print(f"Wanted {self.turns_played+1}, got {data['turn']}")
                         pass
                 else:
-                    print("Got no data from broker")
+                    # print("Got no data from broker")
                     pass
             else:
                 print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
         except Exception as error:
             print(f"Broker error: {error}")
         return None
-
-broker_url = "http://192.168.140.40:8001/test"
-# broker_url = None
 
 ##############################################################################################################
 
@@ -679,6 +687,7 @@ def main():
     parser.add_argument('--max_depth', type=int, help='maximum search depth')
     parser.add_argument('--max_time', type=float, help='maximum search time')
     parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender|manual')
+    parser.add_argument('--broker', type=str, help='play via a game broker')
     args = parser.parse_args()
 
     # parse the game type
@@ -699,6 +708,8 @@ def main():
         options.max_depth = args.max_depth
     if args.max_time is not None:
         options.max_time = args.max_time
+    if args.broker is not None:
+        options.broker = args.broker
 
     # create a new game
     game = Game(options=options)
@@ -720,7 +731,7 @@ def main():
         else:
             move = game.computer_turn()
             if move is not None:
-                game.post_move(move)
+                game.post_move_to_broker(move)
                 print(f"Computer played {move}")
             else:
                 print("Computer doesn't know what to do!!!")

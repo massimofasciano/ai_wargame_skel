@@ -224,6 +224,7 @@ class Options:
     game_type : GameType = GameType.AttackerVsDefender
     alpha_beta : bool = True
     max_turns : int | None = 100
+    randomize_moves : bool = True
 
 ##############################################################################################################
 
@@ -559,7 +560,10 @@ class Game:
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
-        print(f"Evals per depth: {self.stats.evaluations_per_depth}")
+        print(f"Evals per depth: ",end='')
+        for k in sorted(self.stats.evaluations_per_depth.keys()):
+            print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
+        print()
         total_evals = sum(self.stats.evaluations_per_depth.values())
         if self.stats.total_seconds > 0:
             print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
@@ -586,7 +590,13 @@ class Game:
                 best_score = MAX_HEURISTIC_SCORE
             total_depth = 0.0
             total_count = 0
-            for move_candidate in self.move_candidates():
+            move_candidates = self.move_candidates()
+            if self.options.randomize_moves:
+                # turn iterator into list
+                move_candidates = list(move_candidates)
+                # and shuffle it randomly
+                random.shuffle(move_candidates)
+            for move_candidate in move_candidates:
                 new_game_state = self.clone()
                 if not new_game_state.move_unit(move_candidate):
                     continue
@@ -612,6 +622,8 @@ class Game:
                 return (best_score, best_move, total_depth / total_count)
 
     def post_move(self, move: CoordPair):
+        if broker_url is None:
+            return
         r = requests.post(broker_url, json={
             "from": {"row": move.src.row, "col": move.src.col},
             "to": {"row": move.dst.row, "col": move.dst.col},
@@ -619,7 +631,8 @@ class Game:
         })
         print(f"Status Code: {r.status_code}, Response: {r.json()}")
 
-broker_url = "http://192.168.140.40:8001/test"
+# broker_url = "http://192.168.140.40:8001/test"
+broker_url = None
 
 ##############################################################################################################
 

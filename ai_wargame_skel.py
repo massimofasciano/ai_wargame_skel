@@ -17,6 +17,22 @@ class UnitType(Enum):
     Program = 3
     Firewall = 4
 
+_damage_table = [
+    [3,3,3,3,1],
+    [1,1,6,1,1],
+    [9,6,1,6,1],
+    [3,3,3,3,1],
+    [1,1,1,1,1],
+]
+
+_repair_table = [
+    [0,1,1,0,0],
+    [3,0,0,3,3],
+    [0,0,0,0,0],
+    [0,0,0,0,0],
+    [0,0,0,0,0],
+]
+
 class Player(Enum):
     Attacker = 0
     Defender = 1
@@ -58,6 +74,12 @@ class Unit:
     
     def __str__(self) -> str:
         return self.to_string()
+    
+    def damage_amount(self, target: 'Unit') -> int:
+        return _damage_table[self.type.value][target.type.value]
+
+    def repair_amount(self, target: 'Unit') -> int:
+        return _repair_table[self.type.value][target.type.value]
 
 ##############################################################################################################
 
@@ -92,6 +114,12 @@ class Coord:
         for row in range(self.row-dist,self.row+1+dist):
             for col in range(self.col-dist,self.col+1+dist):
                 yield Coord(row,col)
+
+    def iter_adjacent(self) -> Iterable['Coord']:
+        yield Coord(self.row-1,self.col)
+        yield Coord(self.row,self.col-1)
+        yield Coord(self.row+1,self.col)
+        yield Coord(self.row,self.col+1)
 
     @classmethod
     def from_string(cls, s : str) -> 'Coord | None':
@@ -275,9 +303,18 @@ class Game:
                 coords.dst.row-coords.src.row
             ) == 1
 
+    def is_engaged(self, src: Coord) -> bool:
+        source = self.get(src)
+        if source is None:
+            return False
+        for dst in src.iter_adjacent():
+            target = self.get(dst)
+            if target is not None and target.player != source.player:
+                return True
+        return False
+
     def validate_and_move(self, coords : CoordPair, perform_move: bool) -> bool:
         """Validate and optionally perform a move expressed as a CoordPair."""
-        # INCOMPLETE: must check all other move conditions!
         source = self.get(coords.src)
         if source is None or not self.is_valid_coord(coords.dst):
             return False
@@ -293,8 +330,8 @@ class Game:
                             self.remove_dead(coord)
                     self.set(coords.src,None)
                 return True
-            elif target is None and self.check_move_range(coords):
-                # we move it (many checks missing!!!)
+            elif target is None and self.check_move_range(coords) and not self.is_engaged(coords.src):
+                # we move the unit!
                 if perform_move:
                     self.set(coords.dst,source)
                     self.set(coords.src,None) 
@@ -302,15 +339,19 @@ class Game:
             elif target is not None and target.player != source.player and self.check_move_range(coords):
                 # we attack opposing unit!
                 if perform_move:
-                    target.mod_health(-1)
-                    source.mod_health(-1)
+                    target.mod_health(source.damage_amount(target))
+                    source.mod_health(target.damage_amount(source))
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
                 return True
             elif target is not None and target.player == source.player and self.check_move_range(coords):
                 # we repair friendly unit
+                amount = source.repair_amount(target)
+                if amount < 1:
+                    # not valid move if repair amount is 0
+                    return False
                 if perform_move:
-                    target.mod_health(1)
+                    target.mod_health(amount)
                 return True
         return False
 

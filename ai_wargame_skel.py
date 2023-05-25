@@ -590,116 +590,52 @@ class Game:
 
 ##############################################################################################################
 
-def just_testing():
-    g = Game()
-
-    d4 = Coord.from_string("D4")
-    assert(d4 is not None)
-    c1 = Coord(2,1)
-
-    g.set(d4,Unit())
-    g.set(c1,Unit(player=Player.Defender, type=UnitType.Virus, health=3))
-
-    print(repr(g))
-    print(g)
-    print(g.is_empty(d4))
-    print(g.is_empty(Coord(4,4)))
-
-    g.set(d4,None)
-    print(g.is_empty(d4))
-    print(g.get(d4))
-    print(f"{g.get(c1)!r}")
-    print(g.get(c1))
-    print(repr(g.get(c1)))
-
-
-    g.mod_health(c1,-2)
-    print(g.get(c1))
-    g.mod_health(c1,-2)
-    print(g.get(c1))
-
-
-    g.set(c1,Unit(player=Player.Defender))
-    print(g)
-    mv2132 = CoordPair(c1,Coord(3,2))
-    print(g.move_unit(mv2132))
-    g.next_turn()
-    print(g.move_unit(mv2132))
-    print(g)
-
-    g.human_turn()
-    print(g)
-    print(repr(g))
-
-def just_testing2():
-    cp = CoordPair.from_quad(2,3,5,6)
-    print(cp)
-    print()    
-    for c in cp.iter_rectangle():
-        print(c)
-    c = Coord(4,5)
-
-    print()
-
-    print(c)
-    print()
-    for c in c.iter_range(1):
-        print(c)
-
-    g = Game()
-    for (c,u) in g.player_units(Player.Defender):
-        print(f"{c} => {u}")
-
-##############################################################################################################
-
 def main():
     parser = argparse.ArgumentParser(
         prog='ai_wargame',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--max_depth', type=int, help='maximum search depth')
     parser.add_argument('--max_time', type=float, help='maximum search time')
-    parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender')
+    parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender|manual')
     args = parser.parse_args()
+
     if args.game_type == "attacker":
         game_type = GameType.AttackerVsComp
     elif args.game_type == "defender":
         game_type = GameType.CompVsDefender
+    elif args.game_type == "manual":
+        game_type = GameType.AttackerVsDefender
     else:
         game_type = GameType.CompVsComp
+
     options = Options(game_type=game_type)
+
     if args.max_depth is not None:
         options.max_depth = args.max_depth
     if args.max_time is not None:
         options.max_time = args.max_time
+
     game = Game(options=options)
     print(repr(game))
 
-    print(game)
-    if game.options.game_type == GameType.CompVsComp:
-        while True:
-            move = game.computer_turn()
-            print(game)
-            print(f"Computer played {move}")
-            winner = game.has_winner()
-            if winner is not None:
-                print(f"{winner.name} wins!")
-                break
-    elif game.options.game_type == GameType.AttackerVsComp:
-        while True:
+    while True:
+        print()
+        print(game)
+        winner = game.has_winner()
+        if winner is not None:
+            print(f"{winner.name} wins!")
+            break
+        if game.options.game_type == GameType.AttackerVsDefender:
             game.human_turn()
-            print(game)
-            winner = game.has_winner()
-            if winner is not None:
-                print(f"{winner.name} wins!")
-                break
+        elif game.options.game_type == GameType.AttackerVsComp and game.next_player == Player.Attacker:
+            game.human_turn()
+        elif game.options.game_type == GameType.CompVsDefender and game.next_player == Player.Defender:
+            game.human_turn()
+        else:
             move = game.computer_turn()
-            print(game)
             print(f"Computer played {move}")
-            winner = game.has_winner()
-            if winner is not None:
-                print(f"{winner.name} wins!")
-                break
+
+##############################################################################################################
 
 if __name__ == '__main__':
-    # just_testing2()
     main()

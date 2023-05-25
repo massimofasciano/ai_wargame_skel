@@ -548,7 +548,7 @@ class Game:
             return unit.health+100*score
         return (
             sum(map(get_score,self.player_units(player))) -
-            sum(map(get_score,self.player_units(player.next()))) +
+            sum(map(get_score,self.player_units(player.next()))) -
             10 * self.turns_played
         )
 
@@ -569,6 +569,7 @@ class Game:
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
+        print(f"Average recursive depth: {avg_depth:0.1f}")
         print(f"Evals per depth: ",end='')
         for k in sorted(self.stats.evaluations_per_depth.keys()):
             print(f"{k}:{self.stats.evaluations_per_depth[k]} ",end='')
@@ -729,10 +730,11 @@ def main():
         elif game.options.game_type == GameType.CompVsDefender and game.next_player == Player.Defender:
             game.human_turn()
         else:
+            player = game.next_player
             move = game.computer_turn()
             if move is not None:
                 game.post_move_to_broker(move)
-                print(f"Computer played {move}")
+                print(f"Computer {player.name} played {move}")
             else:
                 print("Computer doesn't know what to do!!!")
                 exit(1)

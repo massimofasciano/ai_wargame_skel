@@ -623,25 +623,51 @@ class Game:
     def post_move(self, move: CoordPair):
         if broker_url is None:
             return
-        r = requests.post(broker_url, json={
+        data = {
             "from": {"row": move.src.row, "col": move.src.col},
             "to": {"row": move.dst.row, "col": move.dst.col},
             "turn": self.turns_played
-        })
-        print(f"Status Code: {r.status_code}, Response: {r.json()}")
-        # Status Code: 200, Response: {'success': True, 'data': {'from': {'row': 2, 'col': 4}, 'to': {'row': 1, 'col': 4}, 'turn': 1}}
+        }
+        try:
+            r = requests.post(broker_url, json=data)
+            if r.status_code == 200 and r.json()['success'] and r.json()['data'] == data:
+                # print(f"Sent move to broker: {move}")
+                pass
+            else:
+                print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
+        except Exception as error:
+            print(f"Broker error: {error}")
 
     def get_move(self) -> CoordPair | None:
         if broker_url is None:
             return None
         headers = {'Accept': 'application/json'}
-        r = requests.get(broker_url, headers=headers)
-        print(f"Response: {r.json()}")
-        # Response: {'success': True, 'data': {'from': {'row': 2, 'col': 4}, 'to': {'row': 1, 'col': 4}, 'turn': 1}}
+        try:
+            r = requests.get(broker_url, headers=headers)
+            if r.status_code == 200 and r.json()['success']:
+                data = r.json()['data']
+                if data is not None:
+                    if data['turn'] == self.turns_played+1:
+                        move = CoordPair(
+                            Coord(data['from']['row'],data['from']['col']),
+                            Coord(data['to']['row'],data['to']['col'])
+                        )
+                        print(f"Got move from broker: {move}")
+                        return move
+                    else:
+                        print("Got broker data for wrong turn")
+                        pass
+                else:
+                    print("Got no data from broker")
+                    pass
+            else:
+                print(f"Broker error: status code: {r.status_code}, response: {r.json()}")
+        except Exception as error:
+            print(f"Broker error: {error}")
         return None
 
-# broker_url = "http://192.168.140.40:8001/test"
-broker_url = None
+broker_url = "http://192.168.140.40:8001/test"
+# broker_url = None
 
 ##############################################################################################################
 
@@ -676,7 +702,6 @@ def main():
 
     # create a new game
     game = Game(options=options)
-    print(repr(game))
 
     # the main game loop
     while True:

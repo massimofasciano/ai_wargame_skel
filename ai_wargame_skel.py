@@ -5,6 +5,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from typing import Tuple, TypeVar, Type, Iterable
 import random
+import requests
 
 # maximum and minimum values for our heuristic scores (usually represents an end of game condition)
 MAX_HEURISTIC_SCORE = 1000000
@@ -610,6 +611,16 @@ class Game:
             else:
                 return (best_score, best_move, total_depth / total_count)
 
+    def post_move(self, move: CoordPair):
+        r = requests.post(broker_url, json={
+            "from": {"row": move.src.row, "col": move.src.col},
+            "to": {"row": move.dst.row, "col": move.dst.col},
+            "turn": self.turns_played
+        })
+        print(f"Status Code: {r.status_code}, Response: {r.json()}")
+
+broker_url = "http://192.168.140.40:8001/test"
+
 ##############################################################################################################
 
 def main():
@@ -661,7 +672,12 @@ def main():
             game.human_turn()
         else:
             move = game.computer_turn()
-            print(f"Computer played {move}")
+            if move is not None:
+                game.post_move(move)
+                print(f"Computer played {move}")
+            else:
+                print("Computer doesn't know what to do!!!")
+                exit(1)
 
 ##############################################################################################################
 

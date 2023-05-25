@@ -76,10 +76,16 @@ class Unit:
         return self.to_string()
     
     def damage_amount(self, target: 'Unit') -> int:
-        return _damage_table[self.type.value][target.type.value]
+        amount = _damage_table[self.type.value][target.type.value]
+        if target.health - amount < 0:
+            return target.health
+        return amount
 
     def repair_amount(self, target: 'Unit') -> int:
-        return _repair_table[self.type.value][target.type.value]
+        amount = _repair_table[self.type.value][target.type.value]
+        if target.health + amount > 9:
+            return 9 - target.health
+        return amount
 
 ##############################################################################################################
 
@@ -339,8 +345,8 @@ class Game:
             elif target is not None and target.player != source.player and self.check_move_range(coords):
                 # we attack opposing unit!
                 if perform_move:
-                    target.mod_health(source.damage_amount(target))
-                    source.mod_health(target.damage_amount(source))
+                    target.mod_health(-source.damage_amount(target))
+                    source.mod_health(-target.damage_amount(source))
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
                 return True
@@ -464,7 +470,7 @@ class Game:
             self.stats.evaluations_per_depth[depth] += 1
         # we could use "maximizing" to select different heuristics for min and max stages
         if winner is None:
-            return self.heuristic_health(player)
+            return self.heuristic_e2(player)
         elif winner == player:
             # prefer to win earlier
             return MAX_HEURISTIC_SCORE - self.turns_played
@@ -477,8 +483,40 @@ class Game:
             return cu[1].health
         return (
             sum(map(get_health,self.player_units(player))) -
-            sum(map(get_health,self.player_units(player.next()))) +
-            random.randint(0,1)
+            sum(map(get_health,self.player_units(player.next())))
+        )
+
+    def heuristic_e1(self, player: Player):
+        def get_score(cu : Tuple[Coord,Unit]) -> int:
+            unit = cu[1]
+            score = 1
+            if unit.type == UnitType.Tech or unit.type == UnitType.Virus:
+                # better units
+                score = 3
+            if unit.type == UnitType.AI:
+                # already lose or win
+                score = 0
+            return score
+        return (
+            sum(map(get_score,self.player_units(player))) -
+            sum(map(get_score,self.player_units(player.next())))
+        )
+
+    def heuristic_e2(self, player: Player):
+        def get_score(cu : Tuple[Coord,Unit]) -> int:
+            unit = cu[1]
+            score = 1
+            if unit.type == UnitType.Tech or unit.type == UnitType.Virus:
+                # better units
+                score = 3
+            if unit.type == UnitType.AI:
+                # already lose or win
+                score = 0
+            return unit.health+100*score
+        return (
+            sum(map(get_score,self.player_units(player))) -
+            sum(map(get_score,self.player_units(player.next()))) +
+            10 * self.turns_played
         )
 
     def move_candidates(self) -> Iterable[CoordPair]:

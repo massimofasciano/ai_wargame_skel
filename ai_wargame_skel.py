@@ -392,10 +392,7 @@ class Game:
 
     def next_turn(self):
         """Transitions game to the next turn."""
-        if self.next_player == Player.Attacker:
-            self.next_player = Player.Defender
-        else:
-            self.next_player = Player.Attacker
+        self.next_player = self.next_player.next()
         self.turns_played += 1
 
     def to_string(self) -> str:

@@ -306,19 +306,20 @@ class Game:
         """Validate a move expressed as a CoordPair."""
         return self.validate_and_move(coords,False)
 
-    def move_unit(self, coords : CoordPair) -> bool:
+    def perform_move(self, coords : CoordPair) -> bool:
         """Validate and perform a move expressed as a CoordPair."""
         return self.validate_and_move(coords,True)
 
-    def check_move_range(self, coords: CoordPair) -> bool:
+    def check_move_range(self, coords: CoordPair, motion: bool) -> bool:
         """Is this move within the movement range of a unit?"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
         unit = self.get(coords.src)
         if unit is None:
             return False
-        elif unit.type is UnitType.Tech or unit.type is UnitType.Virus:
-            # tech and virus can retreat
+        elif (not motion) or unit.type is UnitType.Tech or unit.type is UnitType.Virus:
+            # if not moving (attack/repair) or if we are tech or virus
+            # 4 directions allowed
             return (
                 abs(coords.dst.col-coords.src.col)+
                 abs(coords.dst.row-coords.src.row)
@@ -364,13 +365,13 @@ class Game:
                             self.remove_dead(coord)
                     self.set(coords.src,None)
                 return True
-            elif target is None and self.check_move_range(coords) and not self.is_engaged(coords.src):
+            elif target is None and self.check_move_range(coords, motion=True) and not self.is_engaged(coords.src):
                 # we move the unit!
                 if perform_move:
                     self.set(coords.dst,source)
                     self.set(coords.src,None) 
                 return True
-            elif target is not None and target.player != source.player and self.check_move_range(coords):
+            elif target is not None and target.player != source.player and self.check_move_range(coords, motion=False):
                 # we attack opposing unit!
                 if perform_move:
                     target.mod_health(-source.damage_amount(target))
@@ -378,7 +379,7 @@ class Game:
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
                 return True
-            elif target is not None and target.player == source.player and self.check_move_range(coords):
+            elif target is not None and target.player == source.player and self.check_move_range(coords, motion=False):
                 # we repair friendly unit
                 amount = source.repair_amount(target)
                 if amount < 1:
@@ -451,14 +452,14 @@ class Game:
             print("Getting next move with auto-retry from game broker...")
             while True:
                 mv = self.get_move_from_broker()
-                if mv is not None and self.move_unit(mv):
+                if mv is not None and self.perform_move(mv):
                     self.next_turn()
                     break
                 sleep(0.1)
         else:
             while True:
                 mv = self.read_move()
-                if self.move_unit(mv):
+                if self.perform_move(mv):
                     self.next_turn()
                     break
                 else:
@@ -467,7 +468,7 @@ class Game:
     def computer_turn(self) -> CoordPair | None:
         """Computer plays a move."""
         move = self.suggest_move()
-        if move is not None and self.move_unit(move):
+        if move is not None and self.perform_move(move):
             self.next_turn()
         return move
 
@@ -610,13 +611,13 @@ class Game:
                 random.shuffle(move_candidates)
             for move_candidate in move_candidates:
                 new_game_state = self.clone()
-                if not new_game_state.move_unit(move_candidate):
+                if not new_game_state.perform_move(move_candidate):
                     continue
                 new_game_state.next_turn()
                 (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing, player, depth+1, alpha, beta, start_time)
                 total_depth += rec_avg_depth
                 total_count += 1
-                if (maximizing and score >= best_score) or (not maximizing and score <= best_score):
+                if (maximizing and score >= best_score) or ((not maximizing) and score <= best_score):
                     best_score = score
                     best_move = move_candidate
                 if self.options.alpha_beta:

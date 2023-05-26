@@ -356,7 +356,7 @@ class Game:
         target = self.get(coords.dst)
         if source.player == self.next_player:
             if coords.src == coords.dst:
-                # we self destruct (side effects missing!!!)
+                # we self destruct!
                 if perform_move:
                     for coord in coords.src.iter_range(1):
                         unit = self.get(coord)
@@ -373,9 +373,13 @@ class Game:
                 return True
             elif target is not None and target.player != source.player and self.check_move_range(coords, motion=False):
                 # we attack opposing unit!
+                amount = source.damage_amount(target)
+                if amount < 1:
+                    # not valid move if source can't damage target
+                    return False
                 if perform_move:
-                    target.mod_health(-source.damage_amount(target))
-                    source.mod_health(-target.damage_amount(source))
+                    target.mod_health(-amount)
+                    source.mod_health(-target.damage_amount(source)) # target also damages source
                     self.remove_dead(coords.src)
                     self.remove_dead(coords.dst)
                 return True

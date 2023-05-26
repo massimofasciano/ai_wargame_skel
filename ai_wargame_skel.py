@@ -557,10 +557,12 @@ class Game:
         move = CoordPair()
         for (src,_) in self.player_units(self.next_player):
             move.src = src
-            for dst in src.iter_range(1):
+            for dst in src.iter_adjacent():
                 move.dst = dst
                 if self.is_valid_move(move):
                     yield move.clone()
+            move.dst = src
+            yield move.clone()
 
     def suggest_move(self) -> CoordPair|None:
         """Suggest the next move using minimax alpha beta."""

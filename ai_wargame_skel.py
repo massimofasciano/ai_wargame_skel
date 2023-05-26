@@ -253,15 +253,15 @@ class Game:
         self.set(Coord(0,0),Unit(player=Player.Defender,type=UnitType.AI))
         self.set(Coord(1,0),Unit(player=Player.Defender,type=UnitType.Tech))
         self.set(Coord(0,1),Unit(player=Player.Defender,type=UnitType.Tech))
-        self.set(Coord(2,0),Unit(player=Player.Defender,type=UnitType.Program))
-        self.set(Coord(0,2),Unit(player=Player.Defender,type=UnitType.Program))
-        self.set(Coord(1,1),Unit(player=Player.Defender,type=UnitType.Firewall))
+        self.set(Coord(2,0),Unit(player=Player.Defender,type=UnitType.Firewall))
+        self.set(Coord(0,2),Unit(player=Player.Defender,type=UnitType.Firewall))
+        self.set(Coord(1,1),Unit(player=Player.Defender,type=UnitType.Program))
         self.set(Coord(md,md),Unit(player=Player.Attacker,type=UnitType.AI))
         self.set(Coord(md-1,md),Unit(player=Player.Attacker,type=UnitType.Virus))
         self.set(Coord(md,md-1),Unit(player=Player.Attacker,type=UnitType.Virus))
-        self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Firewall))
-        self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Firewall))
-        self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Program))
+        self.set(Coord(md-2,md),Unit(player=Player.Attacker,type=UnitType.Program))
+        self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Program))
+        self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Firewall))
 
     def clone(self) -> 'Game':
         """Make a new copy of a game for minimax recursion.

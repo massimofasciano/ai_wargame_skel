@@ -26,7 +26,7 @@ class Player(Enum):
     Defender = 1
 
     def next(self) -> 'Player':
-        """The other player."""
+        """The next (other) player."""
         if self is Player.Attacker:
             return Player.Defender
         else:
@@ -342,6 +342,9 @@ class Game:
         source = self.get(src)
         if source is None:
             return False
+        if source.type is UnitType.Tech or source.type is UnitType.Virus:
+            # Tech and Virus can move while engaged
+            return False
         for dst in src.iter_adjacent():
             target = self.get(dst)
             if target is not None and target.player != source.player:
@@ -393,7 +396,7 @@ class Game:
                     return (False,"invalid repair")
                 if perform_move:
                     target.mod_health(amount)
-                return (True,"{coords.src} repairs {coords.dst} by {amount}")
+                return (True,f"{coords.src} repairs {coords.dst} by {amount}")
         return (False,"player is not owner of source")
 
     def next_turn(self):
@@ -457,9 +460,9 @@ class Game:
                 mv = self.get_move_from_broker()
                 if mv is not None:
                     (success,result) = self.perform_move(mv)
+                    print(f"Broker {self.next_player.name}: ",end='')
+                    print(result)
                     if success:
-                        print(f"Broker {self.next_player.name}: ",end='')
-                        print(result)
                         self.next_turn()
                         break
                 sleep(0.1)
@@ -621,15 +624,12 @@ class Game:
                 move_candidates = list(move_candidates)
                 # and shuffle it randomly
                 random.shuffle(move_candidates)
-            # print("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv")
             for move_candidate in move_candidates:
                 new_game_state = self.clone()
                 if not new_game_state.perform_move(move_candidate):
                     continue
                 new_game_state.next_turn()
                 (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing, player, depth+1, alpha, beta, start_time)
-                # if depth == 0:
-                #     print(f"{depth*' '} {move_candidate} {score} {maximizing} {rec_avg_depth} {best_move} {best_score}")
                 total_depth += rec_avg_depth
                 total_count += 1
                 if (maximizing and score >= best_score) or ((not maximizing) and score <= best_score):
@@ -644,13 +644,13 @@ class Game:
                         if best_score < alpha:
                             break
                         beta = min(beta, best_score)
-            # print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
             if total_count == 0:
                 return (self.apply_heuristic(player,maximizing,depth,winner),None,depth)
             else:
                 return (best_score, best_move, total_depth / total_count)
 
     def post_move_to_broker(self, move: CoordPair):
+        """Send a move to the game broker."""
         if self.options.broker is None:
             return
         data = {
@@ -669,6 +669,7 @@ class Game:
             print(f"Broker error: {error}")
 
     def get_move_from_broker(self) -> CoordPair | None:
+        """Get a move from the game broker."""
         if self.options.broker is None:
             return None
         headers = {'Accept': 'application/json'}

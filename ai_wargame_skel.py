@@ -545,8 +545,8 @@ class Game:
                 # better units
                 score = 3
             if unit.type == UnitType.AI:
-                # already lose or win
-                score = 0
+                # this is not really important here because of end game condition
+                score = 10
             return score
         player_score = sum(map(get_score,self.player_units(player)))
         opponent_score = sum(map(get_score,self.player_units(player.next())))
@@ -561,8 +561,8 @@ class Game:
                 # better units
                 score = 3
             if unit.type == UnitType.AI:
-                # already lose or win
-                score = 0
+                # this is not really important here because of end game condition
+                score = 10
             return unit.health+100*score
         player_score = sum(map(get_score,self.player_units(player)))
         opponent_score = sum(map(get_score,self.player_units(player.next())))

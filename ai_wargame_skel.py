@@ -244,6 +244,8 @@ class Game:
     turns_played : int = 0
     options: Options = field(default_factory=Options)
     stats: Stats = field(default_factory=Stats)
+    _attacker_has_ai : bool = True
+    _defender_has_ai : bool = True
 
     def __post_init__(self):
         """Automatically called after class init to set up the default board state."""
@@ -293,6 +295,11 @@ class Game:
         unit = self.get(coord)
         if unit is not None and unit.health <= 0:
             self.set(coord,None)
+            if unit.type == UnitType.AI:
+                if unit.player == Player.Attacker:
+                    self._attacker_has_ai = False
+                else:
+                    self._defender_has_ai = False
 
     def mod_health(self, coord : Coord, health_delta : int):
         """Modify health of unit at Coord (positive or negative delta)."""
@@ -366,7 +373,8 @@ class Game:
                         if unit is not None:
                             unit.mod_health(-2)
                             self.remove_dead(coord)
-                    self.set(coords.src,None)
+                    source.health = 0
+                    self.remove_dead(coords.src)
                 return (True,f"{coords.src} self-destructs")
             elif target is None and self.check_move_range(coords, motion=True) and not self.is_engaged(coords.src):
                 # we move the unit!
@@ -504,20 +512,13 @@ class Game:
         """Check if the game is over and returns winner"""
         if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
             return Player.Defender
-        attacker_has_ai = False
-        defender_has_ai = False
-        for coord in CoordPair.from_dim(self.options.dim).iter_rectangle():
-            unit = self.get(coord)
-            if unit is not None:
-                if unit.player == Player.Attacker and unit.type == UnitType.AI:
-                    attacker_has_ai = True
-                if unit.player == Player.Defender and unit.type == UnitType.AI:
-                    defender_has_ai = True
-            if attacker_has_ai and defender_has_ai:
+        elif self._attacker_has_ai:
+            if self._defender_has_ai:
                 return None
-        if attacker_has_ai:
-            return Player.Attacker
-        return Player.Defender
+            else:
+                return Player.Attacker    
+        elif self._defender_has_ai:
+            return Player.Defender
 
     def apply_heuristic(self, player: Player, maximizing: bool, depth: int, winner: Player | None) -> int:
         """Apply custom heuristic evaluation after some general calculations. Potential winner needs to be precalculated."""

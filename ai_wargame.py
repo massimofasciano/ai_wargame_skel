@@ -442,55 +442,6 @@ class Game:
         elif self._defender_has_ai:
             return Player.Defender
 
-    def apply_heuristic(self, player: Player, maximizing: bool, depth: int, winner: Player | None) -> int:
-        """Apply custom heuristic evaluation after some general calculations. Potential winner needs to be precalculated."""
-        if depth not in self.stats.evaluations_per_depth:
-            self.stats.evaluations_per_depth[depth] = 1
-        else:
-            self.stats.evaluations_per_depth[depth] += 1
-        # we could use "maximizing" to select different heuristics for min and max stages
-        if winner is None:
-            h = self.heuristic_e2(player)
-            return h
-        elif winner == player:
-            # prefer to win earlier
-            return MAX_HEURISTIC_SCORE - self.turns_played
-        else:
-            # prefer to lose later
-            return MIN_HEURISTIC_SCORE + self.turns_played
-
-    def heuristic_e1(self, player: Player):
-        """Heuristic based on score per unit type."""
-        def get_score(cu : Tuple[Coord,Unit]) -> int:
-            unit = cu[1]
-            score = 1
-            if unit.type == UnitType.Tech or unit.type == UnitType.Virus:
-                # better units
-                score = 3
-            if unit.type == UnitType.AI:
-                # this is not really important here because of end game condition
-                score = 10
-            return score
-        player_score = sum(map(get_score,self.player_units(player)))
-        opponent_score = sum(map(get_score,self.player_units(player.next())))
-        return player_score - opponent_score
-
-    def heuristic_e2(self, player: Player):
-        """Heuristic based on unit health and score per unit type and game turns."""
-        def get_score(cu : Tuple[Coord,Unit]) -> int:
-            unit = cu[1]
-            score = 1
-            if unit.type == UnitType.Tech or unit.type == UnitType.Virus:
-                # better units
-                score = 3
-            if unit.type == UnitType.AI:
-                # this is not really important here because of end game condition
-                score = 10
-            return unit.health+100*score
-        player_score = sum(map(get_score,self.player_units(player)))
-        opponent_score = sum(map(get_score,self.player_units(player.next())))
-        return player_score - opponent_score - 10 * self.turns_played
-
     def move_candidates(self) -> Iterable[CoordPair]:
         """Generate valid move candidates for the next player."""
         move = CoordPair()
@@ -503,10 +454,20 @@ class Game:
             move.dst = src
             yield move.clone()
 
+    def random_move(self) -> Tuple[int, CoordPair|None, float]:
+        """Returns a random move."""
+        move_candidates = list(self.move_candidates())
+        random.shuffle(move_candidates)
+        if len(move_candidates) > 0:
+            return (0, move_candidates[0], 1)
+        else:
+            return (0, None, 0)
+
     def suggest_move(self) -> CoordPair|None:
-        """Suggest the next move using minimax alpha beta."""
+        """Suggest the next move using minimax alpha beta. TODO: MUST REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
+        print("TODO: replace call to random_move with proper game logic in suggest_move")
         start_time = datetime.now()
-        (score, move, avg_depth) = self.minimax_alpha_beta(True, self.next_player, 0, MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE, start_time)
+        (score, move, avg_depth) = self.random_move()
         elapsed_seconds = (datetime.now() - start_time).total_seconds()
         self.stats.total_seconds += elapsed_seconds
         print(f"Heuristic score: {score}")
@@ -520,57 +481,6 @@ class Game:
             print(f"Eval perf.: {total_evals/self.stats.total_seconds/1000:0.1f}k/s")
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
-
-    def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time: datetime) -> Tuple[int, CoordPair|None, float]:
-        """Minimax with alpha beta pruning."""
-        time_now = datetime.now()
-        elapsed_seconds = (time_now - start_time).total_seconds()
-        timeout = False
-        if self.options.max_time is not None and elapsed_seconds > self.options.max_time:
-            timeout = True
-        winner = self.has_winner()
-        if ((timeout and self.options.min_depth is not None and depth >= self.options.min_depth) or
-           (self.options.max_depth is not None and depth >= self.options.max_depth) or
-           winner is not None):
-            return (self.apply_heuristic(player,maximizing,depth,winner),None,depth)
-        else:
-            best_move = None
-            if maximizing:
-                best_score = MIN_HEURISTIC_SCORE
-            else:
-                best_score = MAX_HEURISTIC_SCORE
-            total_depth = 0.0
-            total_count = 0
-            move_candidates = self.move_candidates()
-            if self.options.randomize_moves:
-                # turn iterator into list
-                move_candidates = list(move_candidates)
-                # and shuffle it randomly
-                random.shuffle(move_candidates)
-            for move_candidate in move_candidates:
-                new_game_state = self.clone()
-                if not new_game_state.perform_move(move_candidate):
-                    continue
-                new_game_state.next_turn()
-                (score, _, rec_avg_depth) = new_game_state.minimax_alpha_beta(not maximizing, player, depth+1, alpha, beta, start_time)
-                total_depth += rec_avg_depth
-                total_count += 1
-                if (maximizing and score >= best_score) or ((not maximizing) and score <= best_score):
-                    best_score = score
-                    best_move = move_candidate
-                if self.options.alpha_beta:
-                    if maximizing:
-                        if best_score > beta:
-                            break
-                        alpha = max(alpha, best_score)
-                    else:
-                        if best_score < alpha:
-                            break
-                        beta = min(beta, best_score)
-            if total_count == 0:
-                return (self.apply_heuristic(player,maximizing,depth,winner),None,depth)
-            else:
-                return (best_score, best_move, total_depth / total_count)
 
     def post_move_to_broker(self, move: CoordPair):
         """Send a move to the game broker."""

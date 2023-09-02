@@ -310,8 +310,7 @@ class Game:
                 self.set(coord,None)
 
     def is_valid_move(self, coords : CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair. (INCOMPLETE FUNCTION!!!!)"""
-        print("TODO: write missing code in is_valid_move")
+        """Validate a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
         unit = self.get(coords.src)
@@ -321,8 +320,7 @@ class Game:
         return (unit is None)
 
     def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
-        """Validate and perform a move expressed as a CoordPair. (INCOMPLETE FUNCTION!!!!)"""
-        print("TODO: write missing code in perform_move")
+        """Validate and perform a move expressed as a CoordPair. TODO: WRITE MISSING CODE!!!"""
         if self.is_valid_move(coords):
             self.set(coords.dst,self.get(coords.src))
             self.set(coords.src,None)
@@ -464,8 +462,7 @@ class Game:
             return (0, None, 0)
 
     def suggest_move(self) -> CoordPair|None:
-        """Suggest the next move using minimax alpha beta. TODO: MUST REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
-        print("TODO: replace call to random_move with proper game logic in suggest_move")
+        """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
         (score, move, avg_depth) = self.random_move()
         elapsed_seconds = (datetime.now() - start_time).total_seconds()

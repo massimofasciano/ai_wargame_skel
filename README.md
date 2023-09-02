@@ -44,7 +44,7 @@ options:
                         maximum search depth (default: None)
   --max_time MAX_TIME   maximum search time (default: None)
   --game_type GAME_TYPE
-                        game type: auto|attacker|defender|manual (default: auto)
+                        game type: auto|attacker|defender|manual (default: manual)
   --broker BROKER       play via a game broker (default: None)
 ```
 

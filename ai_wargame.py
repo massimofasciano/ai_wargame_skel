@@ -310,102 +310,24 @@ class Game:
                 self.set(coord,None)
 
     def is_valid_move(self, coords : CoordPair) -> bool:
-        """Validate a move expressed as a CoordPair."""
-        return self.validate_and_move(coords,perform_move=False)[0]
-
-    def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
-        """Validate and perform a move expressed as a CoordPair."""
-        return self.validate_and_move(coords,perform_move=True)
-
-    def check_move_range(self, coords: CoordPair, motion: bool) -> bool:
-        """Is this move within the movement range of a unit?"""
+        """Validate a move expressed as a CoordPair. (INCOMPLETE FUNCTION!!!!)"""
+        print("TODO: write missing code in is_valid_move")
         if not self.is_valid_coord(coords.src) or not self.is_valid_coord(coords.dst):
             return False
         unit = self.get(coords.src)
-        if unit is None:
+        if unit is None or unit.player != self.next_player:
             return False
-        elif (not motion) or unit.type is UnitType.Tech or unit.type is UnitType.Virus:
-            # if not moving (attack/repair) or if we are tech or virus
-            # 4 directions allowed
-            return (
-                abs(coords.dst.col-coords.src.col)+
-                abs(coords.dst.row-coords.src.row)
-            ) == 1
-        elif unit.player is Player.Attacker:
-            # attacker moves top and left
-            return (
-                coords.src.col-coords.dst.col+
-                coords.src.row-coords.dst.row
-            ) == 1
-        else:
-            # defender moves bottom and right
-            return (
-                coords.dst.col-coords.src.col+
-                coords.dst.row-coords.src.row
-            ) == 1
+        unit = self.get(coords.dst)
+        return (unit is None)
 
-    def is_engaged(self, src: Coord) -> bool:
-        """Is the unit at Coord engaged in combat with opposing units ?"""
-        source = self.get(src)
-        if source is None:
-            return False
-        if source.type is UnitType.Tech or source.type is UnitType.Virus:
-            # Tech and Virus can move while engaged
-            return False
-        for dst in src.iter_adjacent():
-            target = self.get(dst)
-            if target is not None and target.player != source.player:
-                return True
-        return False
-
-    def validate_and_move(self, coords : CoordPair, perform_move: bool) -> Tuple[bool,str]:
-        """Validate and optionally perform a move expressed as a CoordPair."""
-        source = self.get(coords.src)
-        if source is None or not self.is_valid_coord(coords.dst):
-            return (False,"invalid move submitted")
-        target = self.get(coords.dst)
-        if source.player == self.next_player:
-            if coords.src == coords.dst:
-                # we self destruct!
-                if perform_move:
-                    for coord in coords.src.iter_range(1):
-                        unit = self.get(coord)
-                        if unit is not None:
-                            unit.mod_health(-2)
-                            self.remove_dead(coord)
-                    source.health = 0
-                    self.remove_dead(coords.src)
-                return (True,f"{coords.src} self-destructs")
-            elif target is None and self.check_move_range(coords, motion=True) and not self.is_engaged(coords.src):
-                # we move the unit!
-                if perform_move:
-                    self.set(coords.dst,source)
-                    self.set(coords.src,None) 
-                return (True,f"{coords.src} moves to {coords.dst}")
-            elif target is not None and target.player != source.player and self.check_move_range(coords, motion=False):
-                # we attack opposing unit!
-                amount = source.damage_amount(target)
-                if amount < 1:
-                    # not valid move if source can't damage target
-                    return (False,"invalid attack")
-                # target also damages source
-                return_amount = target.damage_amount(source)
-                if perform_move:
-                    target.mod_health(-amount)
-                    source.mod_health(-return_amount)
-                    self.remove_dead(coords.src)
-                    self.remove_dead(coords.dst)
-                return (True,f"{coords.src} attacks {coords.dst}, damage {amount} return {return_amount}")
-            elif target is not None and target.player == source.player and self.check_move_range(coords, motion=False):
-                # we repair friendly unit
-                amount = source.repair_amount(target)
-                if amount < 1:
-                    # not valid move if repair amount is 0
-                    return (False,"invalid repair")
-                if perform_move:
-                    target.mod_health(amount)
-                return (True,f"{coords.src} repairs {coords.dst} by {amount}")
-        return (False,"player is not owner of source")
+    def perform_move(self, coords : CoordPair) -> Tuple[bool,str]:
+        """Validate and perform a move expressed as a CoordPair. (INCOMPLETE FUNCTION!!!!)"""
+        print("TODO: write missing code in perform_move")
+        if self.is_valid_move(coords):
+            self.set(coords.dst,self.get(coords.src))
+            self.set(coords.src,None)
+            return (True,"")
+        return (False,"invalid move")
 
     def next_turn(self):
         """Transitions game to the next turn."""
@@ -708,7 +630,7 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--max_depth', type=int, help='maximum search depth')
     parser.add_argument('--max_time', type=float, help='maximum search time')
-    parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender|manual')
+    parser.add_argument('--game_type', type=str, default="manual", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
     args = parser.parse_args()
 

@@ -1,5 +1,8 @@
 This is a skeleton Python program implementing AI Wargame.
 
+TODO: Complete the code for is_valid_move and perform_move. 
+TODO: Replace the call to random_move in suggest_move with proper game logic.
+
 It is given to you to help bootstrap your project and save some time.
 Some parts have been removed from the complete code. 
 You will have to write those parts. Make sure all of the rules of the game are properly implemented and don't assume that this code checks everything.

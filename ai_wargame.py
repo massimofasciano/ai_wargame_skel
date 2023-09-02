@@ -388,7 +388,7 @@ class Game:
                 if amount < 1:
                     # not valid move if source can't damage target
                     return (False,"invalid attack")
-                 # target also damages source
+                # target also damages source
                 return_amount = target.damage_amount(source)
                 if perform_move:
                     target.mod_health(-amount)

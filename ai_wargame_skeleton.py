@@ -1,3 +1,4 @@
+from __future__ import annotations
 import argparse
 import copy
 from datetime import datetime
@@ -25,7 +26,7 @@ class Player(Enum):
     Attacker = 0
     Defender = 1
 
-    def next(self) -> 'Player':
+    def next(self) -> Player:
         """The next (other) player."""
         if self is Player.Attacker:
             return Player.Defender
@@ -84,14 +85,14 @@ class Unit:
         """Text representation of this unit."""
         return self.to_string()
     
-    def damage_amount(self, target: 'Unit') -> int:
+    def damage_amount(self, target: Unit) -> int:
         """How much can this unit damage another unit."""
         amount = self.damage_table[self.type.value][target.type.value]
         if target.health - amount < 0:
             return target.health
         return amount
 
-    def repair_amount(self, target: 'Unit') -> int:
+    def repair_amount(self, target: Unit) -> int:
         """How much can this unit repair another unit."""
         amount = self.repair_table[self.type.value][target.type.value]
         if target.health + amount > 9:
@@ -128,17 +129,17 @@ class Coord:
         """Text representation of this Coord."""
         return self.to_string()
     
-    def clone(self) -> 'Coord':
+    def clone(self) -> Coord:
         """Clone a Coord."""
         return copy.copy(self)
 
-    def iter_range(self, dist: int) -> Iterable['Coord']:
+    def iter_range(self, dist: int) -> Iterable[Coord]:
         """Iterates over Coords inside a rectangle centered on our Coord."""
         for row in range(self.row-dist,self.row+1+dist):
             for col in range(self.col-dist,self.col+1+dist):
                 yield Coord(row,col)
 
-    def iter_adjacent(self) -> Iterable['Coord']:
+    def iter_adjacent(self) -> Iterable[Coord]:
         """Iterates over adjacent Coords."""
         yield Coord(self.row-1,self.col)
         yield Coord(self.row,self.col-1)
@@ -146,7 +147,7 @@ class Coord:
         yield Coord(self.row,self.col+1)
 
     @classmethod
-    def from_string(cls, s : str) -> 'Coord | None':
+    def from_string(cls, s : str) -> Coord | None:
         """Create a Coord from a string. ex: D2."""
         s = s.strip()
         for sep in " ,.:;-_":
@@ -175,7 +176,7 @@ class CoordPair:
         """Text representation of a CoordPair."""
         return self.to_string()
 
-    def clone(self) -> 'CoordPair':
+    def clone(self) -> CoordPair:
         """Clones a CoordPair."""
         return copy.copy(self)
 
@@ -186,17 +187,17 @@ class CoordPair:
                 yield Coord(row,col)
 
     @classmethod
-    def from_quad(cls, row0: int, col0: int, row1: int, col1: int) -> 'CoordPair':
+    def from_quad(cls, row0: int, col0: int, row1: int, col1: int) -> CoordPair:
         """Create a CoordPair from 4 integers."""
         return CoordPair(Coord(row0,col0),Coord(row1,col1))
     
     @classmethod
-    def from_dim(cls, dim: int) -> 'CoordPair':
+    def from_dim(cls, dim: int) -> CoordPair:
         """Create a CoordPair based on a dim-sized rectangle."""
         return CoordPair(Coord(0,0),Coord(dim-1,dim-1))
     
     @classmethod
-    def from_string(cls, s : str) -> 'CoordPair|None':
+    def from_string(cls, s : str) -> CoordPair | None:
         """Create a CoordPair from a string. ex: A3 B2"""
         s = s.strip()
         for sep in " ,.:;-_":
@@ -239,7 +240,7 @@ class Stats:
 @dataclass(slots=True)
 class Game:
     """Representation of the game state."""
-    board: list[list[Unit|None]] = field(default_factory=list)
+    board: list[list[Unit | None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
     turns_played : int = 0
     options: Options = field(default_factory=Options)
@@ -265,7 +266,7 @@ class Game:
         self.set(Coord(md,md-2),Unit(player=Player.Attacker,type=UnitType.Program))
         self.set(Coord(md-1,md-1),Unit(player=Player.Attacker,type=UnitType.Firewall))
 
-    def clone(self) -> 'Game':
+    def clone(self) -> Game:
         """Make a new copy of a game for minimax recursion.
 
         Shallow copy of everything except the board (options and stats are shared).
@@ -278,14 +279,14 @@ class Game:
         """Check if contents of a board cell of the game at Coord is empty (must be valid coord)."""
         return self.board[coord.row][coord.col] is None
 
-    def get(self, coord : Coord) -> Unit|None:
+    def get(self, coord : Coord) -> Unit | None:
         """Get contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             return self.board[coord.row][coord.col]
         else:
             return None
 
-    def set(self, coord : Coord, unit : Unit|None):
+    def set(self, coord : Coord, unit : Unit | None):
         """Set contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
@@ -452,7 +453,7 @@ class Game:
             move.dst = src
             yield move.clone()
 
-    def random_move(self) -> Tuple[int, CoordPair|None, float]:
+    def random_move(self) -> Tuple[int, CoordPair | None, float]:
         """Returns a random move."""
         move_candidates = list(self.move_candidates())
         random.shuffle(move_candidates)
@@ -461,7 +462,7 @@ class Game:
         else:
             return (0, None, 0)
 
-    def suggest_move(self) -> CoordPair|None:
+    def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta. TODO: REPLACE RANDOM_MOVE WITH PROPER GAME LOGIC!!!"""
         start_time = datetime.now()
         (score, move, avg_depth) = self.random_move()

@@ -240,7 +240,7 @@ class Stats:
 @dataclass(slots=True)
 class Game:
     """Representation of the game state."""
-    board: list[list[Unit|None]] = field(default_factory=list)
+    board: list[list[Unit | None]] = field(default_factory=list)
     next_player: Player = Player.Attacker
     turns_played : int = 0
     options: Options = field(default_factory=Options)
@@ -279,14 +279,14 @@ class Game:
         """Check if contents of a board cell of the game at Coord is empty (must be valid coord)."""
         return self.board[coord.row][coord.col] is None
 
-    def get(self, coord : Coord) -> Unit|None:
+    def get(self, coord : Coord) -> Unit | None:
         """Get contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             return self.board[coord.row][coord.col]
         else:
             return None
 
-    def set(self, coord : Coord, unit : Unit|None):
+    def set(self, coord : Coord, unit : Unit | None):
         """Set contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
@@ -582,7 +582,7 @@ class Game:
             move.dst = src
             yield move.clone()
 
-    def suggest_move(self) -> CoordPair|None:
+    def suggest_move(self) -> CoordPair | None:
         """Suggest the next move using minimax alpha beta."""
         start_time = datetime.now()
         (score, move, avg_depth) = self.minimax_alpha_beta(True, self.next_player, 0, MIN_HEURISTIC_SCORE, MAX_HEURISTIC_SCORE, start_time)
@@ -600,7 +600,7 @@ class Game:
         print(f"Elapsed time: {elapsed_seconds:0.1f}s")
         return move
 
-    def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time: datetime) -> Tuple[int, CoordPair|None, float]:
+    def minimax_alpha_beta(self, maximizing: bool, player: Player, depth: int, alpha: int, beta: int, start_time: datetime) -> Tuple[int, CoordPair | None, float]:
         """Minimax with alpha beta pruning."""
         time_now = datetime.now()
         elapsed_seconds = (time_now - start_time).total_seconds()

@@ -10,8 +10,7 @@ You will have to write those parts. Make sure all of the rules of the game are p
 
 The code uses a lot of abstractions for types and makes ample use of iterators. This was done to make it clearer and is not necessarily what gives the best performance. If you want to try to make the code faster, feel free to experiment at this level but remember that Python is a very slow language and this game has a high branching factor and a lot of turns so a performance gain of 2 or 3 will not allow you to explore a lot more search space.
 
-As a quick reference, the Python code is roughly 200x slower than the same program written in a fast compiled language like Rust with the same higher-level abstractions. In this case, using the pypy runtime instead of the regular python runtime does not help a lot (it might help a bit more if your code uses less abstractions but don't expect miracles).
-Even when running in a web browser via WebAssembly, the Rust code is still around 50x faster than the Python code.
+As a quick reference, the Python code is roughly 100x slower than the same program written in a fast compiled language. Using the pypy runtime instead of the regular python runtime will help (expect at least a 2x speedup).
 
 The code uses classes to represent the following elements:
 

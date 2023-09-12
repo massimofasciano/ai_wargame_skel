@@ -294,7 +294,7 @@ class Game:
     def remove_dead(self, coord: Coord):
         """Remove unit at Coord if dead."""
         unit = self.get(coord)
-        if unit is not None and unit.health <= 0:
+        if unit is not None and not unit.is_alive():
             self.set(coord,None)
             if unit.type == UnitType.AI:
                 if unit.player == Player.Attacker:
@@ -307,8 +307,7 @@ class Game:
         target = self.get(coord)
         if target is not None:
             target.mod_health(health_delta)
-            if not target.is_alive():
-                self.set(coord,None)
+            self.remove_dead(coord)
 
     def is_valid_move(self, coords : CoordPair) -> bool:
         """Validate a move expressed as a CoordPair."""

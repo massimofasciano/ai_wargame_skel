@@ -512,13 +512,12 @@ class Game:
         """Check if the game is over and returns winner"""
         if self.options.max_turns is not None and self.turns_played >= self.options.max_turns:
             return Player.Defender
-        elif self._attacker_has_ai:
+        if self._attacker_has_ai:
             if self._defender_has_ai:
                 return None
             else:
                 return Player.Attacker    
-        elif self._defender_has_ai:
-            return Player.Defender
+        return Player.Defender
 
     def apply_heuristic(self, player: Player, maximizing: bool, depth: int, winner: Player | None) -> int:
         """Apply custom heuristic evaluation after some general calculations. Potential winner needs to be precalculated."""

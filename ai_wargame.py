@@ -706,7 +706,9 @@ def main():
         prog='ai_wargame',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--max_depth', type=int, help='maximum search depth')
+    parser.add_argument('--max_turns', type=int, help='maximum turns')
     parser.add_argument('--max_time', type=float, help='maximum search time')
+    parser.add_argument('--disable_alpha_beta', action="store_true", help='disable alpha-beta pruning')
     parser.add_argument('--game_type', type=str, default="auto", help='game type: auto|attacker|defender|manual')
     parser.add_argument('--broker', type=str, help='play via a game broker')
     args = parser.parse_args()
@@ -731,6 +733,10 @@ def main():
         options.max_time = args.max_time
     if args.broker is not None:
         options.broker = args.broker
+    if args.max_turns is not None:
+        options.max_turns = args.max_turns
+    if args.disable_alpha_beta:
+        options.alpha_beta = False
 
     # create a new game
     game = Game(options=options)

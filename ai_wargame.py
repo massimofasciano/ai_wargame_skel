@@ -67,7 +67,7 @@ class Unit:
         """Are we alive ?"""
         return self.health > 0
 
-    def mod_health(self, health_delta : int):
+    def mod_health(self, health_delta : int) -> None:
         """Modify this unit's health by delta amount."""
         self.health += health_delta
         if self.health < 0:
@@ -248,7 +248,7 @@ class Game:
     _attacker_has_ai : bool = True
     _defender_has_ai : bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Automatically called after class init to set up the default board state."""
         dim = self.options.dim
         self.board = [[None for _ in range(dim)] for _ in range(dim)]
@@ -286,12 +286,12 @@ class Game:
         else:
             return None
 
-    def set(self, coord : Coord, unit : Unit | None):
+    def set(self, coord : Coord, unit : Unit | None) -> None:
         """Set contents of a board cell of the game at Coord."""
         if self.is_valid_coord(coord):
             self.board[coord.row][coord.col] = unit
 
-    def remove_dead(self, coord: Coord):
+    def remove_dead(self, coord: Coord) -> None:
         """Remove unit at Coord if dead."""
         unit = self.get(coord)
         if unit is not None and not unit.is_alive():
@@ -302,7 +302,7 @@ class Game:
                 else:
                     self._defender_has_ai = False
 
-    def mod_health(self, coord : Coord, health_delta : int):
+    def mod_health(self, coord : Coord, health_delta : int) -> None:
         """Modify health of unit at Coord (positive or negative delta)."""
         target = self.get(coord)
         if target is not None:
@@ -407,7 +407,7 @@ class Game:
                 return (True,f"{coords.src} repairs {coords.dst} by {amount}")
         return (False,"player is not owner of source")
 
-    def next_turn(self):
+    def next_turn(self) -> None:
         """Transitions game to the next turn."""
         self.next_player = self.next_player.next()
         self.turns_played += 1
@@ -460,7 +460,7 @@ class Game:
             else:
                 print('Invalid coordinates! Try again.')
     
-    def human_turn(self):
+    def human_turn(self) -> None:
         """Human player plays a move (or get via broker)."""
         if self.options.broker is not None:
             print("Getting next move with auto-retry from game broker...")
@@ -536,7 +536,7 @@ class Game:
             # prefer to lose later
             return MIN_HEURISTIC_SCORE + self.turns_played
 
-    def heuristic_e1(self, player: Player):
+    def heuristic_e1(self, player: Player) -> int:
         """Heuristic based on score per unit type."""
         def get_score(cu : Tuple[Coord,Unit]) -> int:
             unit = cu[1]
@@ -552,7 +552,7 @@ class Game:
         opponent_score = sum(map(get_score,self.player_units(player.next())))
         return player_score - opponent_score
 
-    def heuristic_e2(self, player: Player):
+    def heuristic_e2(self, player: Player) -> int:
         """Heuristic based on unit health and score per unit type and game turns."""
         def get_score(cu : Tuple[Coord,Unit]) -> int:
             unit = cu[1]
@@ -605,7 +605,7 @@ class Game:
         timeout = False
         if self.options.max_time is not None and elapsed_seconds > self.options.max_time:
             timeout = True
-        winner = self.has_winner()
+        winner : Player | None = self.has_winner()
         if ((timeout and self.options.min_depth is not None and depth >= self.options.min_depth) or
            (self.options.max_depth is not None and depth >= self.options.max_depth) or
            winner is not None):
@@ -649,7 +649,7 @@ class Game:
             else:
                 return (best_score, best_move, total_depth / total_count)
 
-    def post_move_to_broker(self, move: CoordPair):
+    def post_move_to_broker(self, move: CoordPair) -> None:
         """Send a move to the game broker."""
         if self.options.broker is None:
             return
@@ -700,7 +700,7 @@ class Game:
 
 ##############################################################################################################
 
-def main():
+def main() -> None:
     # parse command line arguments
     parser = argparse.ArgumentParser(
         prog='ai_wargame',

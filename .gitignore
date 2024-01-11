@@ -2,4 +2,4 @@ __pycache__/
 *.so
 *.pyd
 build/
-*_mypy.*
+ai_wargame_mypy.py
